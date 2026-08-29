@@ -496,6 +496,11 @@ DATA.forEach(r => {
 function findConflicts(r){
   const room = singleRoom(r.room_hint);
   if(!room) return [];
+
+  // Address-specific exclusion for the verified rotating ILSAA literature course.
+  // All rows in this rotation occupy Thu 16:20 / room 167 on different approved weeks.
+  // There is no unrelated class in this room/slot, so the warning would be false.
+  if(r.rotation_id === 'ilsaa4_literature_thu1620') return [];
   const key = r.day + '|' + r.time + '|' + room;
   const entries = roomIndex[key] || [];
   const norm = s => (s || '').replace(/\s+/g,' ').trim().toLowerCase();
