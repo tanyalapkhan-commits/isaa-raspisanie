@@ -134,6 +134,10 @@ Object.keys(GROUP_LABELS).forEach(key=>{
 });
 buildGroupItems();
 
+// Возвращаем исходную вкладку студенческого режима.
+const studentModeButton=document.getElementById('modeStudent');
+if(studentModeButton) studentModeButton.textContent='Я студент';
+
 // Скрываем старые предупреждения о кодах: дальше коды не являются публичным названием группы.
 const st=document.createElement('style');
 st.textContent='.code-warn{display:none!important}.group-code{font-family:inherit!important}';
