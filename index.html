@@ -201,7 +201,7 @@
   .print-title{display:none;}
 
   @media print{
-    .search-box, .browse, .pdf-btn, .legend, .hint, .mode-toggle{display:none !important;}
+    .search-box, .browse, .pdf-btn, .legend, .hint, .mode-toggle, #modeHelp{display:none !important;}
     body{padding:0; background:#fff;}
     .print-title{
       display:block; font-size:24px; font-weight:700; margin-bottom:4px;
@@ -220,12 +220,14 @@
 
   <div class="mode-toggle">
     <button class="mode-btn active" id="modeTeacher" type="button">Я преподаватель</button>
-    <button class="mode-btn" id="modeStudent" type="button">Я студент</button>
+    <button class="mode-btn" id="modeStudent" type="button">По группам</button>
     <button class="mode-btn" id="modeCourse" type="button">Курс</button>
     <button class="mode-btn" id="modeDiscipline" type="button">Дисциплина</button>
     <button class="mode-btn" id="modeDepartment" type="button">Кафедра</button>
     <button class="mode-btn" id="modeRoom" type="button">Аудитория</button>
   </div>
+
+  <div id="modeHelp" class="hint" style="margin:-6px 0 14px;">Выберите режим просмотра: преподаватель, группа, курс, дисциплина, кафедра или аудитория.</div>
 
   <div class="search-box" id="searchBoxNormal">
     <label id="qLabel" for="q">Впишите свою фамилию</label>
@@ -681,14 +683,27 @@ function switchMode(mode){
   searchBoxRoom.style.display = 'none';
   browseBlock.style.display = 'block';
 
+  const modeHelp = document.getElementById('modeHelp');
+  if(modeHelp){
+    const helpMap = {
+      teacher:'Поиск полного расписания конкретного преподавателя.',
+      student:'Полное расписание выбранной группы, включая общие поточные занятия.',
+      course:'Все занятия выбранного курса.',
+      discipline:'Все занятия выбранной дисциплины.',
+      department:'Полное расписание преподавателей выбранной кафедры.',
+      room:'Проверка занятости и вероятно свободных аудиторий.'
+    };
+    modeHelp.textContent = helpMap[mode] || '';
+  }
+
   if(mode === 'teacher'){
     qLabel.textContent = 'Впишите свою фамилию';
     qInput.placeholder = 'Начните печатать…';
     browseToggle.textContent = 'Показать список всех преподавателей';
   } else if(mode === 'student') {
-    qLabel.textContent = 'Выберите свою группу';
-    qInput.placeholder = 'Например: 24Б/П302, арабский, политология…';
-    browseToggle.textContent = 'Показать список всех групп';
+    qLabel.textContent = 'Выберите группу';
+    qInput.placeholder = 'Например: 24Б/И309, китайский, история…';
+    browseToggle.textContent = 'Показать все группы';
   } else if(mode === 'course') {
     qLabel.textContent = 'Выберите курс';
     qInput.placeholder = 'Например: 1 курс бакалавриата…';
