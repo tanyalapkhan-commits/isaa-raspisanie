@@ -211,6 +211,43 @@
     .day-title{break-after:avoid; page-break-after:avoid;}
     .room-chip{break-inside: avoid;}
   }
+
+  /* ===== Просмотр полной картины дня ===== */
+  .day-overview-summary{
+    display:flex; flex-wrap:wrap; gap:8px; margin:12px 0 18px;
+  }
+  .day-summary-chip{
+    display:inline-flex; align-items:center; gap:6px;
+    border:1px solid var(--line); background:#fff; color:var(--ink);
+    border-radius:999px; padding:6px 11px; font-size:14px; font-weight:700;
+  }
+  .day-summary-chip b{color:var(--accent);}
+  .day-time-section{margin:26px 0 34px;}
+  .day-time-heading{
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+    margin:0 0 12px; padding:8px 14px;
+    border-radius:999px; background:#edf2ea;
+    font-size:22px; font-weight:800; color:var(--ink);
+  }
+  .day-time-heading small{
+    font-size:13px; font-weight:700; color:var(--muted);
+  }
+  .day-card-meta{
+    display:inline-flex; flex-wrap:wrap; gap:5px;
+    margin-bottom:8px; padding:4px 9px;
+    border-radius:8px; background:#f2eee7;
+    color:#62584c; font-size:13px; font-weight:700;
+  }
+  .day-problem-note{
+    margin:10px 0 0; padding:10px 12px; border-radius:10px;
+    background:#fff4cf; border:1px solid #e1c86a; color:#6f5710;
+    font-size:14px; font-weight:700;
+  }
+  .day-empty-slot{
+    padding:20px; border:1px dashed var(--line); border-radius:12px;
+    color:var(--muted); text-align:center; background:#faf9f6;
+  }
+
 </style>
 </head>
 <body>
@@ -224,16 +261,31 @@
     <button class="mode-btn" id="modeCourse" type="button">Курс</button>
     <button class="mode-btn" id="modeDiscipline" type="button">Дисциплина</button>
     <button class="mode-btn" id="modeDepartment" type="button">Кафедра</button>
+    <button class="mode-btn" id="modeDay" type="button">По дням</button>
     <button class="mode-btn" id="modeRoom" type="button">Аудитория</button>
   </div>
 
-  <div id="modeHelp" class="hint" style="margin:-6px 0 14px;">Выберите режим просмотра: преподаватель, группа, курс, дисциплина, кафедра или аудитория.</div>
+  <div id="modeHelp" class="hint" style="margin:-6px 0 14px;">Выберите режим просмотра: преподаватель, группа, курс, дисциплина, кафедра, день недели или аудитория.</div>
 
   <div class="search-box" id="searchBoxNormal">
     <label id="qLabel" for="q">Впишите свою фамилию</label>
     <input type="text" id="q" placeholder="Начните печатать…" autocomplete="off">
     <div id="suggestList" class="suggest-list"></div>
     <button class="clear-btn" id="clearBtn">✕ Показать заново</button>
+  </div>
+
+
+  <div class="search-box" id="searchBoxDay" style="display:none;">
+    <label>Полная картина по дню недели</label>
+    <div class="picker-row" id="dayOverviewPicker"></div>
+    <div class="picker-row">
+      <button class="picker-btn active" id="dayShowAllBtn" type="button">Все занятия</button>
+      <button class="picker-btn" id="dayProblemsBtn" type="button">⚠ Только проблемные</button>
+    </div>
+    <div class="hint" style="margin-top:8px;">
+      Показываются все курсы, группы, преподаватели и аудитории выбранного дня. 
+      «Требует уточнения» выводит занятия без подтверждённого дня/времени.
+    </div>
   </div>
 
   <div class="search-box" id="searchBoxRoom" style="display:none;">
@@ -347,7 +399,7 @@ const DAY_ORDER = ['Пн','Вт','Ср','Чт','Пт','Сб'];
 const TIME_ORDER = ['9:00','10:40','13:00','14:40','16:20','17:00','18:00','19:40','20:00'];
 function norm(s){ return (s||'').toString().toLowerCase().replace(/ё/g,'е').trim(); }
 
-let MODE = 'teacher'; // 'teacher' | 'student' | 'course' | 'discipline' | 'department' | 'room'
+let MODE = 'teacher'; // 'teacher' | 'student' | 'course' | 'discipline' | 'department' | 'day' | 'room'
 let GROUP_ITEMS = []; // [{code, label}] sorted
 
 const COURSE_ORDER_PREF = [
@@ -626,15 +678,22 @@ const modeStudentBtn = document.getElementById('modeStudent');
 const modeCourseBtn = document.getElementById('modeCourse');
 const modeDisciplineBtn = document.getElementById('modeDiscipline');
 const modeDepartmentBtn = document.getElementById('modeDepartment');
+const modeDayBtn = document.getElementById('modeDay');
 const modeRoomBtn = document.getElementById('modeRoom');
 const searchBoxNormal = document.getElementById('searchBoxNormal');
+const searchBoxDay = document.getElementById('searchBoxDay');
 const searchBoxRoom = document.getElementById('searchBoxRoom');
+const dayOverviewPicker = document.getElementById('dayOverviewPicker');
+const dayShowAllBtn = document.getElementById('dayShowAllBtn');
+const dayProblemsBtn = document.getElementById('dayProblemsBtn');
 const browseBlock = document.getElementById('browseBlock');
 const dayPicker = document.getElementById('dayPicker');
 const timePicker = document.getElementById('timePicker');
 
 let pickedDay = null;
 let pickedTime = null;
+let pickedOverviewDay = null;
+let dayProblemsOnly = false;
 
 function departmentLabel(d){
   if(!d) return '';
@@ -659,6 +718,9 @@ function currentItems(){
   if(MODE === 'department'){
     return DEPARTMENTS.map(d => ({key:d, display:departmentLabel(d)}));
   }
+  if(MODE === 'day'){
+    return DAY_ORDER.map(d => ({key:d, display:dayFull(d)}));
+  }
   return GROUP_ITEMS.map(g => ({key:g.code, display:g.label}));
 }
 
@@ -669,17 +731,29 @@ function switchMode(mode){
   modeCourseBtn.classList.toggle('active', mode==='course');
   modeDisciplineBtn.classList.toggle('active', mode==='discipline');
   modeDepartmentBtn.classList.toggle('active', mode==='department');
+  modeDayBtn.classList.toggle('active', mode==='day');
   modeRoomBtn.classList.toggle('active', mode==='room');
 
   if(mode === 'room'){
     searchBoxNormal.style.display = 'none';
+    searchBoxDay.style.display = 'none';
     searchBoxRoom.style.display = 'block';
     browseBlock.style.display = 'none';
     buildPickers();
     showEmpty();
     return;
   }
+  if(mode === 'day'){
+    searchBoxNormal.style.display = 'none';
+    searchBoxRoom.style.display = 'none';
+    searchBoxDay.style.display = 'block';
+    browseBlock.style.display = 'none';
+    buildDayOverviewPicker();
+    showEmpty();
+    return;
+  }
   searchBoxNormal.style.display = 'block';
+  searchBoxDay.style.display = 'none';
   searchBoxRoom.style.display = 'none';
   browseBlock.style.display = 'block';
 
@@ -691,6 +765,7 @@ function switchMode(mode){
       course:'Объединённая сетка всех групп выбранного курса; это не персональное расписание студента.',
       discipline:'Все занятия выбранной дисциплины.',
       department:'Полное расписание преподавателей выбранной кафедры.',
+      day:'Полная картина выбранного дня: все курсы, группы, преподаватели и аудитории.',
       room:'Проверка занятости и вероятно свободных аудиторий.'
     };
     modeHelp.textContent = helpMap[mode] || '';
@@ -729,7 +804,160 @@ modeStudentBtn.addEventListener('click', () => switchMode('student'));
 modeCourseBtn.addEventListener('click', () => switchMode('course'));
 modeDisciplineBtn.addEventListener('click', () => switchMode('discipline'));
 modeDepartmentBtn.addEventListener('click', () => switchMode('department'));
+modeDayBtn.addEventListener('click', () => switchMode('day'));
 modeRoomBtn.addEventListener('click', () => switchMode('room'));
+
+
+function buildDayOverviewPicker(){
+  const items = [...DAY_ORDER, 'уточняется'];
+  dayOverviewPicker.innerHTML = items.map(d => {
+    const label = d === 'уточняется' ? 'Требует уточнения' : dayFull(d);
+    return `<button class="picker-btn ${d===pickedOverviewDay?'active':''}" data-overview-day="${d}">${label}</button>`;
+  }).join('');
+  dayShowAllBtn.classList.toggle('active', !dayProblemsOnly);
+  dayProblemsBtn.classList.toggle('active', dayProblemsOnly);
+}
+
+function isDayProblemRow(r){
+  const q = (r.quality || '').toLowerCase().replace(/ё/g,'е');
+  const room = singleRoom(r.room_hint);
+  return r.day === 'уточняется' ||
+         r.time === 'уточняется' ||
+         !room ||
+         !!findConflicts(r).length ||
+         q.includes('конфликт') ||
+         q.includes('требует уточнения') ||
+         q.includes('уточняется') ||
+         q.includes('проверить код группы');
+}
+
+function mergeForDayView(rows){
+  const isCollective = r => {
+    const txt = ((r.extra||'') + ' ' + (r.quality||'')).toLowerCase().replace(/ё/g,'е');
+    return txt.includes('совместное чтение') ||
+           txt.includes('по отдельным недел') ||
+           txt.includes('лекторы по отдельным недел') ||
+           txt.includes('преподаватели читают по отдельным недел');
+  };
+  const merged = {};
+  rows.forEach(r => {
+    const collapseLecturers = isCollective(r);
+    const teacherKey = collapseLecturers ? '__COLLECTIVE__' : (r.teacher||'');
+    const mkey = [r.day, r.time, r.course||'', r.discipline, r.extra||'', teacherKey, r.room_hint||''].join('|||');
+    if(!merged[mkey]){
+      merged[mkey] = {...r, groups:[r.group], teachers:(r.teacher ? [r.teacher] : []), _showCourse:true};
+    } else {
+      if(r.group && !merged[mkey].groups.includes(r.group)) merged[mkey].groups.push(r.group);
+      if(r.teacher && !merged[mkey].teachers.includes(r.teacher)) merged[mkey].teachers.push(r.teacher);
+    }
+  });
+  return Object.values(merged);
+}
+
+function renderDayOverview(day){
+  const resultsEl = document.getElementById('results');
+  const statusEl = document.getElementById('status');
+  resultsEl.innerHTML = '';
+
+  let raw = PUBLIC_DATA.filter(r => r.day === day);
+  let merged = mergeForDayView(raw);
+  if(dayProblemsOnly) merged = merged.filter(isDayProblemRow);
+
+  merged.sort((a,b) =>
+    timeOrder(a.time) - timeOrder(b.time) ||
+    COURSE_ORDER_PREF.indexOf(a.course) - COURSE_ORDER_PREF.indexOf(b.course) ||
+    norm(a.discipline).localeCompare(norm(b.discipline),'ru') ||
+    norm(a.teacher).localeCompare(norm(b.teacher),'ru')
+  );
+
+  const dayLabel = day === 'уточняется' ? 'Требует уточнения' : dayFull(day);
+  const problemCount = mergeForDayView(raw).filter(isDayProblemRow).length;
+  const fixedCount = mergeForDayView(raw).length;
+
+  statusEl.innerHTML =
+    `<b>${dayLabel}</b> — карточек: ${merged.length}` +
+    (dayProblemsOnly ? ` из ${fixedCount}` : '') +
+    `<br><span style="font-size:15px;color:var(--muted)">Потенциально проблемных/неполных карточек: <b>${problemCount}</b>. ` +
+    `Режим показывает общую картину дня по всем курсам и не заменяет расписание конкретной группы.</span>`;
+
+  const courseCounts = {};
+  mergeForDayView(raw).forEach(r => {
+    const c = courseDisplay(r.course || 'Без курса');
+    courseCounts[c] = (courseCounts[c] || 0) + 1;
+  });
+  const summary = document.createElement('div');
+  summary.className = 'day-overview-summary';
+  summary.innerHTML = Object.entries(courseCounts)
+    .sort((a,b)=>a[0].localeCompare(b[0],'ru'))
+    .map(([c,n]) => `<span class="day-summary-chip">${c} <b>${n}</b></span>`)
+    .join('');
+  resultsEl.appendChild(summary);
+
+  if(!merged.length){
+    const empty = document.createElement('div');
+    empty.className = 'day-empty-slot';
+    empty.textContent = dayProblemsOnly
+      ? 'В этом дне нет карточек, попавших под фильтр «только проблемные».'
+      : 'Занятий для выбранного дня не найдено.';
+    resultsEl.appendChild(empty);
+  } else {
+    const buckets = {};
+    merged.forEach(r => {
+      const t = r.time || 'уточняется';
+      (buckets[t] ||= []).push(r);
+    });
+    Object.keys(buckets)
+      .sort((a,b)=>timeOrder(a)-timeOrder(b))
+      .forEach(t => {
+        const sec = document.createElement('section');
+        sec.className = 'day-time-section';
+        const heading = document.createElement('div');
+        heading.className = 'day-time-heading';
+        heading.innerHTML = `<span>${t}</span><small>${buckets[t].length} карточек</small>`;
+        sec.appendChild(heading);
+
+        buckets[t].forEach(r => {
+          const el = card(r);
+          if(isDayProblemRow(r)){
+            const note = document.createElement('div');
+            note.className = 'day-problem-note';
+            const reasons = [];
+            if(r.day === 'уточняется' || r.time === 'уточняется') reasons.push('не подтверждены день/время');
+            if(!singleRoom(r.room_hint)) reasons.push('аудитория не подтверждена/вариантная');
+            if(findConflicts(r).length) reasons.push('есть пересечение по аудитории/слоту');
+            if((r.quality||'').toLowerCase().replace(/ё/g,'е').includes('требует уточнения')) reasons.push('в источнике отмечено «требует уточнения»');
+            note.textContent = '⚠ Для правки: ' + (reasons.length ? reasons.join('; ') : 'есть служебная отметка, требующая проверки');
+            el.appendChild(note);
+          }
+          sec.appendChild(el);
+        });
+        resultsEl.appendChild(sec);
+      });
+  }
+
+  document.getElementById('printTitle').textContent =
+    'Полная картина — ' + dayLabel + ' — осень 2026–2027, ИСАА МГУ';
+  document.getElementById('pdfBtn').classList.add('show');
+}
+
+dayOverviewPicker.addEventListener('click', e => {
+  const btn = e.target.closest('.picker-btn[data-overview-day]');
+  if(!btn) return;
+  pickedOverviewDay = btn.dataset.overviewDay;
+  buildDayOverviewPicker();
+  renderDayOverview(pickedOverviewDay);
+});
+dayShowAllBtn.addEventListener('click', () => {
+  dayProblemsOnly = false;
+  buildDayOverviewPicker();
+  if(pickedOverviewDay) renderDayOverview(pickedOverviewDay);
+});
+dayProblemsBtn.addEventListener('click', () => {
+  dayProblemsOnly = true;
+  buildDayOverviewPicker();
+  if(pickedOverviewDay) renderDayOverview(pickedOverviewDay);
+});
+
 
 function buildPickers(){
   dayPicker.innerHTML = DAY_ORDER.map(d =>
@@ -898,6 +1126,7 @@ function browseText(open){
   if(MODE === 'course') return open ? 'Скрыть курсы' : 'Показать все курсы';
   if(MODE === 'discipline') return open ? 'Скрыть дисциплины' : 'Показать все дисциплины';
   if(MODE === 'department') return open ? 'Скрыть список кафедр' : 'Показать список всех кафедр';
+  if(MODE === 'day') return open ? 'Скрыть дни' : 'Показать дни недели';
   return open ? 'Скрыть список групп' : 'Показать список всех групп';
 }
 browseToggle.addEventListener('click', () => {
@@ -931,6 +1160,10 @@ function showEmpty(){
   document.getElementById('pdfBtn').classList.remove('show');
   if(MODE === 'room'){
     document.getElementById('status').textContent = 'Выберите день и время.';
+    return;
+  }
+  if(MODE === 'day'){
+    document.getElementById('status').textContent = 'Выберите день недели, чтобы увидеть полную картину расписания.';
     return;
   }
   const count = MODE === 'teacher'
@@ -1314,7 +1547,11 @@ function card(r){
   const groupsHtml = groupsList.length
     ? groupsList.map(g => GROUP_LABELS[g] ? `<button class="group-code group-link" data-group="${escapeAttr(g)}" title="Показать полное расписание группы">${g}</button>` : `<span class="group-code">${g}</span>`).join(' ')
     : '<span class="group-code">не указана</span>';
+  const dayMetaHtml = r._showCourse
+    ? `<div class="day-card-meta">${courseDisplay(r.course || 'Без курса')}${r.direction ? ' · ' + r.direction : ''}</div>`
+    : '';
   el.innerHTML = `
+    ${dayMetaHtml}
     <div class="row1">
       <span class="time">${r.time}</span>
       <span class="discipline">${r.discipline}</span>
@@ -1365,7 +1602,7 @@ document.getElementById('results').addEventListener('click', e => {
 });
 
 buildBrowseList();
-document.getElementById('status').textContent = 'Всего преподавателей: ' + TEACHERS.length + '. Можно искать преподавателя, полное расписание группы, отдельную группу западного языка, расписание всего курса, кафедры или аудитории.';
+document.getElementById('status').textContent = 'Всего преподавателей: ' + TEACHERS.length + '. Можно искать преподавателя, группу, курс, дисциплину, кафедру, смотреть полную картину по дням недели или проверять аудитории.';
 </script>
 </body>
 </html>
