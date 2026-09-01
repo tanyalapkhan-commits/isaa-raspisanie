@@ -6725,5 +6725,87 @@ relabelRoot(document.getElementById('status'));
   }
 })();
 </script>
+<!-- Правка 33: 4 курс, историки хауса — восстановление среды и актуальные группы -->
+<script>
+(function(){
+  'use strict';
+  if(typeof DATA === 'undefined') return;
+
+  const oldSuahili = '23Б/И315/7';
+  const oldHausa = '23Б/И316/7';
+  const suahili = '23Б/И416-суахили/7';
+  const hausa = '23Б/И422-хауса/7';
+  const suetina = 'Суетина Юлия Георгиевна';
+  const ova = 'Основной восточный язык (по изучаемому языку)';
+  const clean = value => String(value == null ? '' : value).replace(/\s+/g,' ').trim();
+  let groupRowsFixed = 0;
+  let ovaRestored = 0;
+
+  DATA.forEach(row=>{
+    if(!row) return;
+
+    const groupText = clean(row.group);
+    if(groupText === oldSuahili + ', ' + oldHausa ||
+       groupText === oldSuahili + '; ' + oldHausa){
+      row.group = suahili + '; ' + hausa;
+      row.groups = [suahili,hausa];
+      row.direction = 'История';
+      row.quality = (row.quality ? row.quality + ' | ' : '') +
+        '01.09.2026 — старые обозначения объединённых групп '+oldSuahili+' и '+oldHausa+
+        ' заменены на актуальные группы 4 курса: история — суахили и история — хауса.';
+      groupRowsFixed++;
+    }
+
+    if(clean(row.teacher) === suetina && clean(row.group) === hausa &&
+       clean(row.discipline) === ova && row.day === 'уточняется' && row.time === 'уточняется'){
+      row.day = 'Ср';
+      row.time = '13:00';
+      row.room_hint = '315';
+      row.quality = (row.quality ? row.quality + ' | ' : '') +
+        '01.09.2026 — пятая пара ОВЯ хауса восстановлена в допустимом слоте Ср 13:00. '+
+        'Среда с 14:40 закрыта под МФК; аудитория 419 в 13:00 закреплена за С.Л. Кравченко, поэтому назначена аудитория 315.';
+      ovaRestored++;
+    }
+  });
+
+  if(typeof GROUP_LABELS !== 'undefined'){
+    GROUP_LABELS[suahili] = '4 курс — история — суахили';
+    GROUP_LABELS[hausa] = '4 курс — история — хауса';
+  }
+
+  if(typeof PUBLIC_DATA !== 'undefined'){
+    const rows = typeof isServiceRow === 'function' ? DATA.filter(row=>!isServiceRow(row)) : DATA.slice();
+    PUBLIC_DATA.splice(0,PUBLIC_DATA.length,...rows);
+  }
+
+  if(typeof roomIndex === 'object'){
+    Object.keys(roomIndex).forEach(key=>delete roomIndex[key]);
+    DATA.forEach(row=>{
+      const room = typeof singleRoom === 'function' ? singleRoom(row.room_hint) : '';
+      if(!room) return;
+      const key = row.day + '|' + row.time + '|' + room;
+      (roomIndex[key] || (roomIndex[key] = [])).push({
+        teacher:row.teacher,
+        group:row.group,
+        discipline:row.discipline,
+        extra:row.extra || '',
+        quality:row.quality || '',
+        rotation_id:row.rotation_id || null
+      });
+    });
+  }
+
+  try{ if(typeof buildGroupItems === 'function') buildGroupItems(); }catch(e){}
+  try{ if(typeof buildBrowseList === 'function') buildBrowseList(); }catch(e){}
+  try{ if(typeof showEmpty === 'function') showEmpty(); }catch(e){}
+
+  if(groupRowsFixed !== 5){
+    console.warn('Группы 4 курса суахили/хауса: ожидалось 5 объединённых строк, изменено ' + groupRowsFixed);
+  }
+  if(ovaRestored !== 1){
+    console.warn('ОВЯ 4 курса хауса на среду: ожидалась 1 строка, изменено ' + ovaRestored);
+  }
+})();
+</script>
 </body>
 </html>
