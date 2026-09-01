@@ -6094,5 +6094,58 @@ relabelRoot(document.getElementById('status'));
   };
 })();
 </script>
+<!-- Правка 21: Овчинникова Л.В., 2 курс — историки и политологи-японисты -->
+<script>
+(function(){
+  'use strict';
+  if(typeof DATA === 'undefined') return;
+
+  const groupCodes = [
+    '25Б/И224-японский/3',
+    '25Б/П224-японский/3'
+  ];
+  const targetSlots = new Set(['Пн|9:00','Пн|10:40','Ср|9:00','Чт|9:00']);
+  const normValue = value => String(value == null ? '' : value).toLowerCase().replace(/ё/g,'е').trim();
+
+  const isTarget = row => row &&
+    normValue(row.teacher) === 'овчинникова любовь всеволодовна' &&
+    row.course === '2 бакалавриат' &&
+    targetSlots.has(row.day + '|' + row.time) &&
+    normValue(row.discipline).includes('основной восточный язык') &&
+    normValue(row.extra).includes('япон');
+
+  let changed = 0;
+  DATA.forEach(row => {
+    if(!isTarget(row)) return;
+    row.group = groupCodes.join('; ');
+    row.groups = [...groupCodes];
+    row.direction = 'История + Политология';
+    row.quality = '01.09.2026 — подтверждённая правка по справочнику отображения групп: прежнее обозначение «2 курс, 2-я группа японского» раскрыто как две группы — историки-японисты и политологи-японисты. День, время, преподаватель и аудитория не изменены.';
+    changed++;
+  });
+
+  if(changed !== 4){
+    console.warn('Правка Овчинниковой, 2 курс: ожидалось 4 занятия, изменено ' + changed);
+  }
+
+  if(typeof PUBLIC_DATA !== 'undefined'){
+    const rows = typeof isServiceRow === 'function' ? DATA.filter(row=>!isServiceRow(row)) : DATA.slice();
+    PUBLIC_DATA.splice(0, PUBLIC_DATA.length, ...rows);
+  }
+
+  /* В дневном и других объединённых представлениях поле groups создаётся заново.
+     Перед карточкой возвращаем две отдельные кликабельные группы. */
+  if(typeof card === 'function'){
+    const previousCard = card;
+    card = function(row){
+      if(isTarget(row)) row.groups = [...groupCodes];
+      return previousCard(row);
+    };
+  }
+
+  try{ if(typeof buildGroupItems === 'function') buildGroupItems(); }catch(e){}
+  try{ if(typeof buildBrowseList === 'function') buildBrowseList(); }catch(e){}
+})();
+</script>
 </body>
 </html>
