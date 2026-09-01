@@ -6380,5 +6380,39 @@ relabelRoot(document.getElementById('status'));
   try{ if(typeof showEmpty === 'function') showEmpty(); }catch(e){}
 })();
 </script>
+<!-- Правка 25: список «Я преподаватель» синхронизирован с актуальной базой -->
+<script>
+(function(){
+  'use strict';
+  if(typeof TEACHERS === 'undefined' || typeof PUBLIC_DATA === 'undefined') return;
+
+  const junk = new Set(['','—','-','–','уточняется','не указан','не указано','неизвестно','нет данных']);
+  const isRealTeacher = value => {
+    const name = typeof value === 'string' ? value.trim() : '';
+    return !!name && !junk.has(name.toLowerCase()) && /[A-Za-zА-Яа-яЁё]/.test(name);
+  };
+  const names = new Set();
+
+  PUBLIC_DATA.forEach(row=>{
+    if(isRealTeacher(row && row.teacher)) names.add(row.teacher.trim());
+    if(Array.isArray(row && row.teachers)){
+      row.teachers.forEach(name=>{ if(isRealTeacher(name)) names.add(name.trim()); });
+    }
+    if(Array.isArray(row && row.joint_readers)){
+      row.joint_readers.forEach(name=>{ if(isRealTeacher(name)) names.add(name.trim()); });
+    }
+  });
+
+  const current = [...names].sort((a,b)=>a.localeCompare(b,'ru'));
+  TEACHERS.splice(0,TEACHERS.length,...current);
+
+  if(!TEACHERS.includes('Кравченко Светлана Леонидовна')){
+    console.warn('Кравченко Светлана Леонидовна не попала в список преподавателей после синхронизации.');
+  }
+
+  try{ if(typeof buildBrowseList === 'function') buildBrowseList(); }catch(e){}
+  try{ if(typeof showEmpty === 'function') showEmpty(); }catch(e){}
+})();
+</script>
 </body>
 </html>
