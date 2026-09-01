@@ -15,16 +15,20 @@ const map={
 "24Б/И324-японский/5":"3 курс — история — японский",
 "24Б/П324-японский/5":"3 курс — политика — японский",
 "24Б/Ф324-японский/5":"3 курс — филология — японский",
-"24Б/Э324-японский/5":"3 курс — экономика — японский"
+"24Б/Э324-японский/5":"3 курс — экономика — японский",
+"25Б/Р224_3":"4 курс — филология — японский",
+"25Б/Р224_3 ·":"4 курс — филология — японский ·"
 };
-function replace(node){
+function replaceText(node){
  if(node.nodeType===Node.TEXT_NODE){
   let t=node.nodeValue;
-  Object.keys(map).forEach(k=>{t=t.split(k).join(map[k]);});
+  for(const k in map){t=t.split(k).join(map[k]);}
   node.nodeValue=t;
- } else if(node.childNodes){node.childNodes.forEach(replace);}
+ } else if(node.childNodes){node.childNodes.forEach(replaceText);}
 }
-function run(){if(document.body) replace(document.body);}
+function run(){
+ if(document.body){replaceText(document.body);}
+}
 run();
-new MutationObserver(run).observe(document.documentElement,{childList:true,subtree:true});
+new MutationObserver(run).observe(document.documentElement,{childList:true,subtree:true,characterData:true});
 })();
