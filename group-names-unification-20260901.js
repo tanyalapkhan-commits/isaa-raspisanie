@@ -3,23 +3,16 @@
 (function(){
   const profile={И:'история',П:'политика',Ф:'филология',Э:'экономика'};
   const magProfile={И:'история',Л:'филология',П:'политология',Э:'экономика',Я:'японоведение'};
-  const map={
-    '26Б/И102-арабский/1':'1 курс — история — арабский',
-    '26Б/П124-японский/1':'1 курс — политика — японский',
-    '26Б/Ф124-японский/1':'1 курс — филология — японский',
-    '26Б/Э124-японский/1':'1 курс — экономика — японский'
-  };
   const course={'1':'1 курс','3':'2 курс','5':'3 курс','7':'4 курс'};
 
   function autoName(value){
-    if(map[value]) return map[value];
-    let m=value.match(/^(\d+)Б\/([ИПФЭ])(\d+)-(.+)\/(\d)$/);
+    let m=value.match(/^(\d+)Б\/([ИПФЭ])(\d+)-(.+)\/(1|3|5|7)$/);
     if(m){
-      return (course[m[5]]||m[5])+' — '+profile[m[2]]+' — '+m[4];
+      return (course[m[5]]||m[5])+' — '+profile[m[2]]+' — '+m[4].trim();
     }
-    m=value.match(/^(\d+)М\/([ИЛПЭЯ])\s*\((.+)\)\/(\d)$/);
+    m=value.match(/^(\d+)М\/([ИЛПЭЯ])\s*\((.+)\)\/(\d+)$/);
     if(m){
-      return 'магистратура — '+magProfile[m[2]]+' — '+m[3];
+      return 'магистратура — '+magProfile[m[2]]+' — '+m[3].trim();
     }
     return value;
   }
@@ -28,14 +21,12 @@
     const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
     const nodes=[];
     while(walker.nextNode()) nodes.push(walker.currentNode);
-    nodes.forEach(n=>{
-      let t=n.nodeValue;
-      Object.keys(map).forEach(oldName=>{
-        if(t.includes(oldName)) t=t.split(oldName).join(map[oldName]);
+    nodes.forEach(function(n){
+      const old=n.nodeValue;
+      const updated=old.replace(/\b\d+[БМ]\/[^,;\n]+?\/\d+\b/g,function(x){
+        return autoName(x);
       });
-      const re=/\b\d+[БМ]\/[^,;\n]+?\/\d\b/g;
-      t=t.replace(re,function(x){return autoName(x);});
-      if(t!==n.nodeValue) n.nodeValue=t;
+      if(updated!==old) n.nodeValue=updated;
     });
   }
 
