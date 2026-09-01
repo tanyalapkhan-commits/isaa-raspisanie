@@ -3,84 +3,24 @@
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta http-equiv="Pragma" content="no-cache">
-<meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<!-- build: 2026-09-01T14:24+03:00 -->
+<!-- build: 2026-09-01T15:30+03:00 -->
 <title>Расписание ИСАА — найти своё</title>
-<style>
-  body{font-family:Georgia,"Times New Roman",serif;background:#faf7f0;color:#1f2a24;padding:32px;line-height:1.5}
-  .load{max-width:720px;margin:10vh auto;background:#fff;border:1px solid #e2d9c8;border-radius:14px;padding:24px}
-</style>
 </head>
 <body>
 <div class="load" id="loader">Загружаю актуальное расписание 2026–2027…</div>
 <script>
 (async function(){
-  const frozenBase='https://raw.githubusercontent.com/tanyalapkhan-commits/isaa-raspisanie/0411abf15a672017371701a0adf99089a8747309/index.html';
-  const siteBase='https://tanyalapkhan-commits.github.io/isaa-raspisanie/';
-  const patches=[
-    'hotfix-20260831.js?v=20260831-2',
-    'hotfix-kaimova-20260831.js?v=20260831-1',
-    'restore-student-tabs-20260831.js?v=20260831-1',
-    'teacher-fixes-20260831.js?v=20260831-1',
-    'arabic-remarks-20260831.js?v=20260831-1',
-    'nalich-tomorrow-20260901.js?v=20260901-1',
-    'student-groups-simple-20260831.js?v=20260831-1',
-    'dedupe-firstyear-20260831.js?v=20260831-1',
-    'iranian-redistribution-20260831.js?v=20260831-1',
-    'arabic-clarity-20260831.js?v=20260831-1',
-    'goryacheva-groups-20260831.js?v=20260831-1',
-    'arabic-groups-20260831.js?v=20260831-1',
-    'kaimova-mag-groups-20260831.js?v=20260831-1',
-    'korean-maternity-cleanup-20260831.js?v=20260831-1',
-    'magdalinskaya-20260901.js?v=20260901-1',
-    'east-russia-20260901.js?v=20260901-1',
-    'zhantiev-room-20260901.js?v=20260901-1',
-    'aganina-theory-20260901.js?v=20260901-1',
-    'nugmanova-conflict-20260901.js?v=20260901-1',
-    'vikhrova-ilu-20260901.js?v=20260901-1',
-    'nikolskaya-history-20260901.js?v=20260901-1',
-    'turkic-department-20260901.js?v=20260901-1',
-    'judaics-department-20260901.js?v=20260901-1',
-    'baraboshkina-sept4-20260901.js?v=20260901-1',
-    'arabic-thirdyear-groups-20260901.js?v=20260901-1',
-    'urgent-student-fixes-20260901.js?v=20260901-1',
-    'china-309-conflict-20260901.js?v=20260901-1',
-    'china-309-monday-20260901.js?v=20260901-1',
-    'japanese-firstyear-group3-20260901.js?v=20260901-1',
-    'african-studies-urb-kravchenko-20260901.js?v=20260901-1',
-    'ardashnikova-persian3-conflict-20260901.js?v=20260901-1',
-    'kirillina-ardashnikova-final-20260901.js?v=20260901-1',
-    'kirillina-tue1300-restore-20260901.js?v=20260901-1',
-    'public-cleanup-20260831.js?v=20260831-2',
-    'ardashnikova-visible-final-20260901.js?v=20260901-1',
-    'kirillina-room-ardashnikova-seminar-final-20260901.js?v=20260901-1',
-    'ardashnikova-tue1300-restore-final-20260901.js?v=20260901-1',
-    'hindi4-english-conflict-final-20260901.js?v=20260901-2',
-    'student-teacher-parity-final-20260901.js?v=20260901-1',
-    'student-teacher-parity-broadfix-20260901.js?v=20260901-1',
-    'safronova-416-kirillina-room-20260901.js?v=20260901-2',
-    'kirillina-tue1440-room228-final-20260901.js?v=20260901-1'
-  ];
-  try{
-    const response=await fetch(frozenBase,{cache:'no-store'});
-    if(!response.ok) throw new Error('HTTP '+response.status);
-    let html=await response.text();
-    if(!/<base\s/i.test(html) && /<head[^>]*>/i.test(html)){
-      html=html.replace(/<head([^>]*)>/i,'<head$1><base href="'+siteBase+'">');
-    }
-    const injection=patches.map(function(p){
-      return '<script src="'+siteBase+p+'"><'+'/script>';
-    }).join('\n');
-    if(/<\/body>/i.test(html)) html=html.replace(/<\/body>/i,injection+'\n</body>');
-    else html+=injection;
-    document.open();
-    document.write(html);
-    document.close();
-  }catch(err){
-    document.getElementById('loader').innerHTML='<b>Не удалось загрузить расписание.</b><br>Обновите страницу через несколько секунд. Техническая ошибка: '+String(err.message||err);
-  }
+const frozenBase='https://raw.githubusercontent.com/tanyalapkhan-commits/isaa-raspisanie/0411abf15a672017371701a0adf99089a8747309/index.html';
+const siteBase='https://tanyalapkhan-commits.github.io/isaa-raspisanie/';
+const patches=[
+'group-display-normalization-20260901-force.js?v=20260901-2'
+];
+const response=await fetch(frozenBase,{cache:'no-store'});
+let html=await response.text();
+const injection=patches.map(p=>'<script src="'+siteBase+p+'"><'+'/script>').join('\n');
+html=html.replace('</body>',injection+'</body>');
+document.open();document.write(html);document.close();
 })();
 </script>
 </body>
