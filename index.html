@@ -818,7 +818,7 @@ function switchMode(mode){
     browseToggle.textContent = 'Показать все курсы';
   } else if(mode === 'discipline') {
     qLabel.textContent = 'Введите название дисциплины';
-    qInput.placeholder = 'Например: БЖД, НИС, история литературы…';
+    qInput.placeholder = 'Например: НИС, история литературы, ОВЯ…';
     browseToggle.textContent = 'Показать все дисциплины';
   } else {
     qLabel.textContent = 'Выберите кафедру';
@@ -1486,9 +1486,6 @@ function showSchedule(key){
   }
   if(MODE === 'course'){
     statusEl.innerHTML += '<br><span style="font-size:15px;color:var(--muted)">Показаны все занятия этого курса без выбора отдельной группы. Это объединённая сетка всего курса, а НЕ расписание одного студента. Для языков действует правило: не более 2 языковых пар у одного студента в день.</span>';
-    if(key === '2 бакалавриат'){
-      statusEl.innerHTML += '<br><span style="font-size:15px;color:var(--muted)"><b>Почему в понедельник видна БЖД:</b> в текущей сетке БЖД разбита на четыре разных потока Пн 9:00 / 10:40 / 13:00 / 16:20. В режиме «По курсу» видны все четыре; в расписании конкретной академической группы показывается только её поток.</span>';
-    }
   }
   if(MODE === 'discipline'){
     const disciplineTeachers = [...new Set(matches.map(r => r.teacher).filter(Boolean))];
@@ -6145,6 +6142,53 @@ relabelRoot(document.getElementById('status'));
 
   try{ if(typeof buildGroupItems === 'function') buildGroupItems(); }catch(e){}
   try{ if(typeof buildBrowseList === 'function') buildBrowseList(); }catch(e){}
+})();
+</script>
+<!-- Правка 22: БЖД полностью удалена со 2 курса -->
+<script>
+(function(){
+  'use strict';
+  if(typeof DATA === 'undefined') return;
+  const normValue = value => String(value == null ? '' : value).toLowerCase().replace(/ё/g,'е').trim();
+  const isSecondCourseBzhd = row => row &&
+    row.course === '2 бакалавриат' &&
+    (normValue(row.discipline) === 'безопасность жизнедеятельности' || normValue(row.discipline) === 'бжд');
+
+  const removed = DATA.filter(isSecondCourseBzhd);
+  for(let index = DATA.length - 1; index >= 0; index--){
+    if(isSecondCourseBzhd(DATA[index])) DATA.splice(index,1);
+  }
+
+  if(removed.length !== 5){
+    console.warn('Удаление БЖД со 2 курса: ожидалось 5 строк (4 потока и 1 строка «уточняется»), удалено ' + removed.length);
+  }
+
+  if(typeof PUBLIC_DATA !== 'undefined'){
+    const rows = typeof isServiceRow === 'function' ? DATA.filter(row=>!isServiceRow(row)) : DATA.slice();
+    PUBLIC_DATA.splice(0, PUBLIC_DATA.length, ...rows);
+  }
+
+  /* Убираем дисциплину и преподавателей из списков, если после удаления
+     у них не осталось других занятий в расписании. */
+  if(typeof DISCIPLINE_ITEMS !== 'undefined'){
+    for(let index = DISCIPLINE_ITEMS.length - 1; index >= 0; index--){
+      const key = normValue(DISCIPLINE_ITEMS[index].display || DISCIPLINE_ITEMS[index].key);
+      if((key === 'безопасность жизнедеятельности' || key === 'бжд') &&
+         !DATA.some(row=>normValue(row.discipline) === key)){
+        DISCIPLINE_ITEMS.splice(index,1);
+      }
+    }
+  }
+  if(typeof TEACHERS !== 'undefined'){
+    for(let index = TEACHERS.length - 1; index >= 0; index--){
+      const teacher = TEACHERS[index];
+      if(!DATA.some(row=>row && row.teacher === teacher)) TEACHERS.splice(index,1);
+    }
+  }
+
+  try{ if(typeof buildGroupItems === 'function') buildGroupItems(); }catch(e){}
+  try{ if(typeof buildBrowseList === 'function') buildBrowseList(); }catch(e){}
+  try{ if(typeof showEmpty === 'function') showEmpty(); }catch(e){}
 })();
 </script>
 </body>
