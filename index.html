@@ -6543,5 +6543,187 @@ relabelRoot(document.getElementById('status'));
   try{ if(typeof showEmpty === 'function') showEmpty(); }catch(e){}
 })();
 </script>
+<!-- Правка 31: старый шифр группы хауса заменён на актуальные группы 2026/27 -->
+<script>
+(function(){
+  'use strict';
+  if(typeof DATA === 'undefined') return;
+
+  const mappings = [
+    {
+      oldCodes:['25Б/Р110_1/3 (И)'],
+      newCode:'25Б/И210-хауса/3',
+      label:'2 курс — история — хауса',
+      direction:'История'
+    },
+    {
+      oldCodes:['25Б/Р110_1/3 (Э)',' 25Б/Р110_1/3 (Э)'],
+      newCode:'25Б/Э210-хауса/3',
+      label:'2 курс — экономика — хауса',
+      direction:'Экономика'
+    }
+  ];
+
+  const clean = value => String(value == null ? '' : value).replace(/\s+/g,' ').trim();
+  const mapByOld = new Map();
+  mappings.forEach(mapping=>mapping.oldCodes.forEach(code=>mapByOld.set(clean(code),mapping)));
+  const counts = Object.fromEntries(mappings.map(mapping=>[mapping.newCode,0]));
+
+  DATA.forEach(row=>{
+    if(!row) return;
+    const mapping = mapByOld.get(clean(row.group));
+    if(!mapping) return;
+
+    row.group = mapping.newCode;
+    if(Array.isArray(row.groups)){
+      row.groups = [...new Set(row.groups.map(code=>{
+        const item = mapByOld.get(clean(code));
+        return item ? item.newCode : code;
+      }))];
+    }
+    row.course = '2 бакалавриат';
+    row.direction = mapping.direction;
+    row.extra = row.extra || 'хауса';
+    row.quality = (row.quality ? row.quality + ' | ' : '') +
+      '01.09.2026 — старый технический шифр Р110_1 заменён по актуальному справочнику групп 2026/27 на ' +
+      mapping.newCode + ' (' + mapping.label + ').';
+    counts[mapping.newCode]++;
+  });
+
+  if(typeof GROUP_LABELS !== 'undefined'){
+    mappings.forEach(mapping=>{
+      mapping.oldCodes.forEach(code=>delete GROUP_LABELS[code]);
+      GROUP_LABELS[mapping.newCode] = mapping.label;
+    });
+  }
+
+  if(typeof PUBLIC_DATA !== 'undefined'){
+    const rows = typeof isServiceRow === 'function' ? DATA.filter(row=>!isServiceRow(row)) : DATA.slice();
+    PUBLIC_DATA.splice(0,PUBLIC_DATA.length,...rows);
+  }
+
+  if(typeof roomIndex === 'object'){
+    Object.keys(roomIndex).forEach(key=>delete roomIndex[key]);
+    DATA.forEach(row=>{
+      const room = typeof singleRoom === 'function' ? singleRoom(row.room_hint) : '';
+      if(!room) return;
+      const key = row.day + '|' + row.time + '|' + room;
+      (roomIndex[key] || (roomIndex[key] = [])).push({
+        teacher:row.teacher,
+        group:row.group,
+        discipline:row.discipline,
+        extra:row.extra || '',
+        quality:row.quality || '',
+        rotation_id:row.rotation_id || null
+      });
+    });
+  }
+
+  /* Старые обозначения остаются поисковыми алиасами и переводятся
+     на актуальную группу до запуска обычного поиска. */
+  const search = document.getElementById('query');
+  if(search){
+    search.addEventListener('input',function(){
+      const value = clean(search.value);
+      const mapping = mapByOld.get(value);
+      if(!mapping) return;
+      search.value = mapping.newCode;
+      search.dispatchEvent(new Event('input',{bubbles:true}));
+    });
+  }
+
+  try{ if(typeof buildGroupItems === 'function') buildGroupItems(); }catch(e){}
+  try{ if(typeof buildBrowseList === 'function') buildBrowseList(); }catch(e){}
+  try{ if(typeof showEmpty === 'function') showEmpty(); }catch(e){}
+
+  if(counts['25Б/И210-хауса/3'] !== 3){
+    console.warn('Замена исторической группы хауса: ожидалось 3 занятия Львовой, изменено ' + counts['25Б/И210-хауса/3']);
+  }
+  if(counts['25Б/Э210-хауса/3'] !== 1){
+    console.warn('Замена экономической группы хауса: ожидалось 1 занятие Львовой, изменено ' + counts['25Б/Э210-хауса/3']);
+  }
+})();
+</script>
+<!-- Правка 32: сняты пересечения группы хауса и аудитории 419 -->
+<script>
+(function(){
+  'use strict';
+  if(typeof DATA === 'undefined') return;
+
+  const lvova = 'Львова Элеонора Сергеевна';
+  const suetina = 'Суетина Юлия Георгиевна';
+  const hausaHistory = '25Б/И210-хауса/3';
+  const targetDiscipline = 'Основные проблемы и тенденции исторического развития изучаемой страны';
+  const clean = value => String(value == null ? '' : value).replace(/\s+/g,' ').trim();
+  let lvovaMoved = 0;
+  let suetinaRowsMoved = 0;
+
+  DATA.forEach(row=>{
+    if(!row) return;
+
+    if(clean(row.teacher) === lvova && clean(row.group) === hausaHistory &&
+       clean(row.discipline) === targetDiscipline){
+      if(row.day === 'Вт' && row.time === '9:00'){
+        row.day = 'Пт';
+        row.time = '10:40';
+        row.room_hint = '328';
+        lvovaMoved++;
+      }else if(row.day === 'Ср' && row.time === '9:00'){
+        row.day = 'Пт';
+        row.time = '13:00';
+        row.room_hint = '328';
+        lvovaMoved++;
+      }else{
+        return;
+      }
+      row.quality = (row.quality ? row.quality + ' | ' : '') +
+        '01.09.2026 — перенесено на пятницу после ОВЯ хауса для устранения пересечения группы; аудитория 328 свободна и подходит для презентаций.';
+      return;
+    }
+
+    if(clean(row.teacher) !== suetina || clean(row.room_hint) !== '419') return;
+    const slot = row.day + '|' + row.time;
+    if(!new Set(['Ср|10:40','Чт|14:40','Пт|14:40']).has(slot)) return;
+
+    row.room_hint = '315';
+    row.quality = (row.quality ? row.quality + ' | ' : '') +
+      '01.09.2026 — аудитория изменена с 419 на 315: в этом слоте 419 закреплена за С.Л. Кравченко.';
+    suetinaRowsMoved++;
+  });
+
+  if(typeof PUBLIC_DATA !== 'undefined'){
+    const rows = typeof isServiceRow === 'function' ? DATA.filter(row=>!isServiceRow(row)) : DATA.slice();
+    PUBLIC_DATA.splice(0,PUBLIC_DATA.length,...rows);
+  }
+
+  if(typeof roomIndex === 'object'){
+    Object.keys(roomIndex).forEach(key=>delete roomIndex[key]);
+    DATA.forEach(row=>{
+      const room = typeof singleRoom === 'function' ? singleRoom(row.room_hint) : '';
+      if(!room) return;
+      const key = row.day + '|' + row.time + '|' + room;
+      (roomIndex[key] || (roomIndex[key] = [])).push({
+        teacher:row.teacher,
+        group:row.group,
+        discipline:row.discipline,
+        extra:row.extra || '',
+        quality:row.quality || '',
+        rotation_id:row.rotation_id || null
+      });
+    });
+  }
+
+  try{ if(typeof buildGroupItems === 'function') buildGroupItems(); }catch(e){}
+  try{ if(typeof buildBrowseList === 'function') buildBrowseList(); }catch(e){}
+  try{ if(typeof showEmpty === 'function') showEmpty(); }catch(e){}
+
+  if(lvovaMoved !== 2){
+    console.warn('Перенос занятий Львовой: ожидалось 2 строки, изменено ' + lvovaMoved);
+  }
+  if(suetinaRowsMoved !== 4){
+    console.warn('Замена аудитории Суетиной: ожидалось 4 строки в трёх общих слотах, изменено ' + suetinaRowsMoved);
+  }
+})();
+</script>
 </body>
 </html>
