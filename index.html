@@ -6168,6 +6168,26 @@ relabelRoot(document.getElementById('status'));
     PUBLIC_DATA.splice(0, PUBLIC_DATA.length, ...rows);
   }
 
+  /* Индекс аудиторий создаётся при первом открытии страницы из исходного DATA.
+     После удаления БЖД обязательно собираем его заново, иначе удалённые пары
+     могли оставаться во вкладке «Аудитория» и в проверке пересечений. */
+  if(typeof roomIndex === 'object'){
+    Object.keys(roomIndex).forEach(key=>delete roomIndex[key]);
+    DATA.forEach(row=>{
+      const room = typeof singleRoom === 'function' ? singleRoom(row.room_hint) : '';
+      if(!room) return;
+      const key = row.day + '|' + row.time + '|' + room;
+      (roomIndex[key] || (roomIndex[key] = [])).push({
+        teacher: row.teacher,
+        group: row.group,
+        discipline: row.discipline,
+        extra: row.extra || '',
+        quality: row.quality || '',
+        rotation_id: row.rotation_id || null
+      });
+    });
+  }
+
   /* Убираем дисциплину и преподавателей из списков, если после удаления
      у них не осталось других занятий в расписании. */
   if(typeof DISCIPLINE_ITEMS !== 'undefined'){
@@ -6184,6 +6204,78 @@ relabelRoot(document.getElementById('status'));
       const teacher = TEACHERS[index];
       if(!DATA.some(row=>row && row.teacher === teacher)) TEACHERS.splice(index,1);
     }
+  }
+
+  try{ if(typeof buildGroupItems === 'function') buildGroupItems(); }catch(e){}
+  try{ if(typeof buildBrowseList === 'function') buildBrowseList(); }catch(e){}
+  try{ if(typeof showEmpty === 'function') showEmpty(); }catch(e){}
+})();
+</script>
+<!-- Правка 23: восстановлены две пары Е.Г. Фроловой в среду -->
+<script>
+(function(){
+  'use strict';
+  if(typeof DATA === 'undefined') return;
+
+  const teacher = 'Фролова Елена Геннадьевна';
+  const targetGroups = new Set([
+    '24Б/И321-филип.-индонез./5',
+    '24Б/П321-филип.-индонез./5',
+    '24Б/Ф321-филип.-индонез./5',
+    '24Б/Э321-филип.-индонез./5'
+  ]);
+  const normValue = value => String(value == null ? '' : value).toLowerCase().replace(/ё/g,'е').trim();
+  let ovaChanged = 0;
+  let theoryChanged = 0;
+
+  DATA.forEach(row=>{
+    if(!row || row.teacher !== teacher || row.course !== '3 бакалавриат') return;
+
+    if(targetGroups.has(row.group) &&
+       normValue(row.discipline).includes('основной восточный язык') &&
+       !normValue(row.discipline).includes('теория')){
+      row.day = 'Ср';
+      row.time = '10:40';
+      row.room_hint = '331 К';
+      row.quality = '01.09.2026 — подтверждено Е.Г. Фроловой: 3 курс, филиппинско-индонезийские группы; ОВЯ (филиппинский) — среда 10:40, ауд.331 К.';
+      ovaChanged++;
+      return;
+    }
+
+    if(row.group === '24Б/Ф321-филип.-индонез./5' &&
+       normValue(row.discipline).includes('теория основного восточного языка')){
+      row.day = 'Ср';
+      row.time = '13:00';
+      row.room_hint = '331 К';
+      row.quality = '01.09.2026 — подтверждено Е.Г. Фроловой: 3 курс, филиппинско-индонезийская группа; Теория ОВЯ — среда 13:00, ауд.331 К.';
+      theoryChanged++;
+    }
+  });
+
+  if(ovaChanged !== 4 || theoryChanged !== 1){
+    console.warn('Правка Фроловой на среду: ожидалось 4 строки ОВЯ и 1 строка Теории ОВЯ; изменено ' + ovaChanged + ' и ' + theoryChanged);
+  }
+
+  if(typeof PUBLIC_DATA !== 'undefined'){
+    const rows = typeof isServiceRow === 'function' ? DATA.filter(row=>!isServiceRow(row)) : DATA.slice();
+    PUBLIC_DATA.splice(0, PUBLIC_DATA.length, ...rows);
+  }
+
+  if(typeof roomIndex === 'object'){
+    Object.keys(roomIndex).forEach(key=>delete roomIndex[key]);
+    DATA.forEach(row=>{
+      const room = typeof singleRoom === 'function' ? singleRoom(row.room_hint) : '';
+      if(!room) return;
+      const key = row.day + '|' + row.time + '|' + room;
+      (roomIndex[key] || (roomIndex[key] = [])).push({
+        teacher: row.teacher,
+        group: row.group,
+        discipline: row.discipline,
+        extra: row.extra || '',
+        quality: row.quality || '',
+        rotation_id: row.rotation_id || null
+      });
+    });
   }
 
   try{ if(typeof buildGroupItems === 'function') buildGroupItems(); }catch(e){}
