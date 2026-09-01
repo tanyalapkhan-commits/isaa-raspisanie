@@ -6414,5 +6414,134 @@ relabelRoot(document.getElementById('status'));
   try{ if(typeof showEmpty === 'function') showEmpty(); }catch(e){}
 })();
 </script>
+<!-- Правка 26: аудитория 419 закреплена за С.Л. Кравченко -->
+<script>
+(function(){
+  'use strict';
+  if(typeof DATA === 'undefined') return;
+  const teacher = 'Кравченко Светлана Леонидовна';
+  let changed = 0;
+
+  DATA.forEach(row=>{
+    if(!row || row.teacher !== teacher) return;
+    row.room_hint = '419';
+    row.quality = (row.quality ? row.quality + ' | ' : '') +
+      '01.09.2026 — за С.Л. Кравченко закреплена аудитория 419 на все дни и все занятия.';
+    changed++;
+  });
+
+  if(changed !== 6){
+    console.warn('Закрепление аудитории 419 за С.Л. Кравченко: ожидалось 6 занятий, изменено ' + changed);
+  }
+
+  if(typeof PUBLIC_DATA !== 'undefined'){
+    const rows = typeof isServiceRow === 'function' ? DATA.filter(row=>!isServiceRow(row)) : DATA.slice();
+    PUBLIC_DATA.splice(0,PUBLIC_DATA.length,...rows);
+  }
+
+  if(typeof roomIndex === 'object'){
+    Object.keys(roomIndex).forEach(key=>delete roomIndex[key]);
+    DATA.forEach(row=>{
+      const room = typeof singleRoom === 'function' ? singleRoom(row.room_hint) : '';
+      if(!room) return;
+      const key = row.day + '|' + row.time + '|' + room;
+      (roomIndex[key] || (roomIndex[key] = [])).push({
+        teacher:row.teacher,
+        group:row.group,
+        discipline:row.discipline,
+        extra:row.extra || '',
+        quality:row.quality || '',
+        rotation_id:row.rotation_id || null
+      });
+    });
+  }
+
+  try{ if(typeof buildBrowseList === 'function') buildBrowseList(); }catch(e){}
+  try{ if(typeof showEmpty === 'function') showEmpty(); }catch(e){}
+})();
+</script>
+<!-- Правка 27: актуальная амхарская группа С.Л. Кравченко -->
+<script>
+(function(){
+  'use strict';
+  if(typeof DATA === 'undefined') return;
+
+  const teacher = 'Кравченко Светлана Леонидовна';
+  const oldCode = '24Б/Р201_1/5';
+  const newCode = '24Б/И301-амхарский/5';
+  const displayName = '3 курс — история — амхарский';
+  let changed = 0;
+
+  DATA.forEach(row=>{
+    if(!row || row.teacher !== teacher) return;
+    row.group = newCode;
+    if(Array.isArray(row.groups)) row.groups = [newCode];
+    row.course = '3 бакалавриат';
+    row.direction = 'История';
+    row.extra = 'амхарский';
+    row.quality = (row.quality ? row.quality + ' | ' : '') +
+      '01.09.2026 — старый технический шифр '+oldCode+' заменён по актуальному справочнику 2026/27 на '+newCode+' ('+displayName+').';
+    changed++;
+  });
+
+  if(changed !== 6){
+    console.warn('Замена амхарской группы С.Л. Кравченко: ожидалось 6 занятий, изменено ' + changed);
+  }
+
+  if(typeof GROUP_LABELS !== 'undefined'){
+    delete GROUP_LABELS[oldCode];
+    GROUP_LABELS[newCode] = displayName;
+  }
+
+  if(typeof PUBLIC_DATA !== 'undefined'){
+    const rows = typeof isServiceRow === 'function' ? DATA.filter(row=>!isServiceRow(row)) : DATA.slice();
+    PUBLIC_DATA.splice(0,PUBLIC_DATA.length,...rows);
+  }
+
+  if(typeof roomIndex === 'object'){
+    Object.keys(roomIndex).forEach(key=>delete roomIndex[key]);
+    DATA.forEach(row=>{
+      const room = typeof singleRoom === 'function' ? singleRoom(row.room_hint) : '';
+      if(!room) return;
+      const key = row.day + '|' + row.time + '|' + room;
+      (roomIndex[key] || (roomIndex[key] = [])).push({
+        teacher:row.teacher,
+        group:row.group,
+        discipline:row.discipline,
+        extra:row.extra || '',
+        quality:row.quality || '',
+        rotation_id:row.rotation_id || null
+      });
+    });
+  }
+
+  /* В карточках показываем понятное название, но data-group сохраняет
+     актуальный внутренний код, поэтому переход к полному расписанию работает. */
+  function relabelGroup(root){
+    if(!root) return root;
+    const walker = document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
+    const nodes = [];
+    while(walker.nextNode()) nodes.push(walker.currentNode);
+    nodes.forEach(node=>{
+      if((node.nodeValue || '').includes(newCode)){
+        node.nodeValue = node.nodeValue.split(newCode).join(displayName);
+      }
+      if((node.nodeValue || '').includes(oldCode)){
+        node.nodeValue = node.nodeValue.split(oldCode).join(displayName);
+      }
+    });
+    return root;
+  }
+
+  if(typeof card === 'function'){
+    const previousCard = card;
+    card = function(row){ return relabelGroup(previousCard(row)); };
+  }
+
+  try{ if(typeof buildGroupItems === 'function') buildGroupItems(); }catch(e){}
+  try{ if(typeof buildBrowseList === 'function') buildBrowseList(); }catch(e){}
+  try{ if(typeof showEmpty === 'function') showEmpty(); }catch(e){}
+})();
+</script>
 </body>
 </html>
