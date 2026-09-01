@@ -6283,5 +6283,102 @@ relabelRoot(document.getElementById('status'));
   try{ if(typeof showEmpty === 'function') showEmpty(); }catch(e){}
 })();
 </script>
+<!-- Правка 24: отдельная подсветка пересечений по группам -->
+<style>
+  .card-group-conflict{
+    border-left-color:#d18a00;
+    background:#fffaf0;
+    box-shadow:0 0 0 2px #f0c86e;
+  }
+  .group-conflict-warn{
+    margin-top:8px;
+    background:#fff1bf;
+    color:#714600;
+    border:1px solid #dda72b;
+    border-radius:8px;
+    padding:8px 12px;
+    font-size:15px;
+    font-weight:700;
+  }
+</style>
+<script>
+(function(){
+  'use strict';
+  if(typeof PUBLIC_DATA === 'undefined' || typeof card !== 'function') return;
+
+  const clean = value => String(value == null ? '' : value).replace(/\s+/g,' ').trim();
+  const normalized = value => clean(value).toLowerCase().replace(/ё/g,'е');
+
+  function rowGroupCodes(row){
+    const values = Array.isArray(row && row.groups) && row.groups.length
+      ? row.groups
+      : [row && row.group];
+    const codes = values.flatMap(value=>clean(value).split(/[;,]/).map(clean)).filter(Boolean);
+    return [...new Set(codes.filter(code=>
+      typeof GROUP_LABELS === 'undefined' || Object.prototype.hasOwnProperty.call(GROUP_LABELS,code)
+    ))];
+  }
+
+  function alternatingWeeks(a,b){
+    const left = normalized((a && a.extra) + ' ' + (a && a.quality));
+    const right = normalized((b && b.extra) + ' ' + (b && b.quality));
+    const leftOdd = /нечетн|1-я неделя/.test(left);
+    const leftEven = /четн|2-я неделя/.test(left) && !leftOdd;
+    const rightOdd = /нечетн|1-я неделя/.test(right);
+    const rightEven = /четн|2-я неделя/.test(right) && !rightOdd;
+    return (leftOdd && rightEven) || (leftEven && rightOdd);
+  }
+
+  function findGroupConflicts(row){
+    if(!row || row.day === 'уточняется' || row.time === 'уточняется') return [];
+    const groups = new Set(rowGroupCodes(row));
+    if(!groups.size) return [];
+    const discipline = normalized(row.discipline);
+
+    return PUBLIC_DATA.filter(other=>{
+      if(!other || other === row || other.day !== row.day || other.time !== row.time) return false;
+      if(normalized(other.discipline) === discipline) return false;
+      if(alternatingWeeks(row,other)) return false;
+      return rowGroupCodes(other).some(code=>groups.has(code));
+    });
+  }
+
+  window.findGroupConflicts = findGroupConflicts;
+
+  const previousCard = card;
+  card = function(row){
+    const element = previousCard(row);
+    const conflicts = findGroupConflicts(row);
+    if(!conflicts.length) return element;
+
+    if(!element.classList.contains('card-conflict')){
+      element.classList.add('card-group-conflict');
+    }
+
+    const currentGroups = new Set(rowGroupCodes(row));
+    const descriptions = [...new Set(conflicts.map(other=>{
+      const common = rowGroupCodes(other).filter(code=>currentGroups.has(code));
+      const groupText = common.map(code=>GROUP_LABELS[code] || code).join(', ');
+      const teacherText = clean(other.teacher) || 'преподаватель не указан';
+      return groupText + ': ' + clean(other.discipline) + ' — ' + teacherText;
+    }))];
+
+    const warning = document.createElement('div');
+    warning.className = 'group-conflict-warn';
+    warning.textContent = '◆ Пересечение по группе: ' + descriptions.join('; ');
+    element.appendChild(warning);
+    return element;
+  };
+
+  if(typeof isDayProblemRow === 'function'){
+    const previousIsDayProblemRow = isDayProblemRow;
+    isDayProblemRow = function(row){
+      return previousIsDayProblemRow(row) || findGroupConflicts(row).length > 0;
+    };
+  }
+
+  try{ if(typeof showEmpty === 'function') showEmpty(); }catch(e){}
+})();
+</script>
 </body>
 </html>
