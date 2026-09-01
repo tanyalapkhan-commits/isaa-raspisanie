@@ -6773,6 +6773,34 @@ relabelRoot(document.getElementById('status'));
     GROUP_LABELS[hausa] = '4 курс — история — хауса';
   }
 
+  /* Во всех карточках показываем понятные названия групп. Атрибут data-group
+     не меняется, поэтому клик по названию по-прежнему открывает полное расписание. */
+  function relabelGroups(root){
+    if(!root || typeof document === 'undefined') return root;
+    const replacements = [
+      [oldSuahili,'4 курс — история — суахили'],
+      [oldHausa,'4 курс — история — хауса'],
+      [suahili,'4 курс — история — суахили'],
+      [hausa,'4 курс — история — хауса']
+    ];
+    const walker = document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
+    const nodes = [];
+    while(walker.nextNode()) nodes.push(walker.currentNode);
+    nodes.forEach(node=>{
+      let value = node.nodeValue || '';
+      replacements.forEach(([code,label])=>{
+        value = value.split(code).join(label);
+      });
+      node.nodeValue = value;
+    });
+    return root;
+  }
+
+  if(typeof card === 'function'){
+    const previousCard = card;
+    card = function(row){ return relabelGroups(previousCard(row)); };
+  }
+
   if(typeof PUBLIC_DATA !== 'undefined'){
     const rows = typeof isServiceRow === 'function' ? DATA.filter(row=>!isServiceRow(row)) : DATA.slice();
     PUBLIC_DATA.splice(0,PUBLIC_DATA.length,...rows);
