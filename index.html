@@ -6835,5 +6835,88 @@ relabelRoot(document.getElementById('status'));
   }
 })();
 </script>
+<!-- Правка 35: 3 курс, китаисты — корректное отображение групп во всех вкладках -->
+<script>
+(function(){
+  'use strict';
+  if(typeof DATA === 'undefined' || !Array.isArray(DATA) ||
+     typeof PUBLIC_DATA === 'undefined' || typeof GROUP_LABELS === 'undefined') return;
+
+  const labels = {
+    '24Б/И309-китайский/5':'3 курс — история — китайский',
+    '24Б/П309-китайский/5':'3 курс — политика — китайский',
+    '24Б/Ф309-китайский/5':'3 курс — филология — китайский',
+    '24Б/Э309-1-китайский/5':'3 курс — экономика — китайский — подгруппа 1',
+    '24Б/Э309-2-китайский/5':'3 курс — экономика — китайский — подгруппа 2'
+  };
+  const norm = value => String(value == null ? '' : value)
+    .toLowerCase().replace(/ё/g,'е').replace(/\s+/g,' ').trim();
+
+  /* Ранее преподаватель Ульянов был отменён для этой версии расписания.
+     Удаляем его записи из исходного массива, чтобы они не возвращались
+     ни в студенческом, ни в преподавательском, ни в дневном представлении. */
+  for(let i = DATA.length - 1; i >= 0; i--){
+    if(norm(DATA[i] && DATA[i].teacher) === 'ульянов марк юрьевич') DATA.splice(i,1);
+  }
+  if(typeof TEACHERS !== 'undefined' && Array.isArray(TEACHERS)){
+    TEACHERS = TEACHERS.filter(name => norm(name) !== 'ульянов марк юрьевич');
+  }
+
+  Object.entries(labels).forEach(([code,label]) => { GROUP_LABELS[code] = label; });
+
+  function replaceVisibleGroupCodes(root){
+    if(!root || typeof document === 'undefined') return root;
+    const walker = document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
+    const nodes = [];
+    while(walker.nextNode()) nodes.push(walker.currentNode);
+    nodes.forEach(node => {
+      let value = node.nodeValue || '';
+      Object.entries(labels).forEach(([code,label]) => {
+        value = value.split(code).join(label);
+      });
+      node.nodeValue = value;
+    });
+    return root;
+  }
+
+  /* card используется режимами «Я преподаватель», «Я студент»,
+     «По группам», «Курс», «По дням», «Дисциплина», «Кафедра» и
+     «Аудитория», поэтому одной обёрткой синхронизируем все вкладки. */
+  if(typeof card === 'function' && !card.__china3Labels35){
+    const previousCard = card;
+    const wrappedCard = function(row){
+      return replaceVisibleGroupCodes(previousCard(row));
+    };
+    wrappedCard.__china3Labels35 = true;
+    card = wrappedCard;
+  }
+
+  const publicRows = typeof isServiceRow === 'function'
+    ? DATA.filter(row => !isServiceRow(row))
+    : DATA.slice();
+  PUBLIC_DATA.splice(0,PUBLIC_DATA.length,...publicRows);
+
+  if(typeof roomIndex === 'object'){
+    Object.keys(roomIndex).forEach(key => delete roomIndex[key]);
+    PUBLIC_DATA.forEach(row => {
+      const room = typeof singleRoom === 'function' ? singleRoom(row.room_hint) : '';
+      if(!room) return;
+      const key = row.day + '|' + row.time + '|' + room;
+      (roomIndex[key] || (roomIndex[key] = [])).push({
+        teacher:row.teacher,
+        group:row.group,
+        discipline:row.discipline,
+        extra:row.extra || '',
+        quality:row.quality || '',
+        rotation_id:row.rotation_id || null
+      });
+    });
+  }
+
+  try{ if(typeof buildGroupItems === 'function') buildGroupItems(); }catch(e){}
+  try{ if(typeof buildBrowseList === 'function') buildBrowseList(); }catch(e){}
+  try{ if(typeof showEmpty === 'function') showEmpty(); }catch(e){}
+})();
+</script>
 </body>
 </html>
