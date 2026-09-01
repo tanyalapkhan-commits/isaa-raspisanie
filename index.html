@@ -247,6 +247,18 @@
     padding:20px; border:1px dashed var(--line); border-radius:12px;
     color:var(--muted); text-align:center; background:#faf9f6;
   }
+  .day-filter-panel{margin-top:14px;padding:14px;border:1px solid var(--line);border-radius:12px;background:#faf9f6}
+  .day-filter-title{margin-bottom:10px;font-size:15px;font-weight:800;color:var(--ink)}
+  .day-filter-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+  .day-filter-field{display:flex;flex-direction:column;gap:5px}
+  .day-filter-field label{font-size:13px;font-weight:700;color:var(--muted)}
+  .day-filter-field select{width:100%;min-height:42px;padding:8px 34px 8px 10px;border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--ink);font:inherit;font-size:15px}
+  .day-filter-actions{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-top:11px}
+  .day-filter-reset{border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--ink);padding:8px 12px;font:inherit;font-weight:700;cursor:pointer}
+  .day-filter-result{font-size:14px;color:var(--muted)}
+  .day-filter-empty{margin:18px 0;padding:22px;border:1px dashed var(--line);border-radius:12px;text-align:center;color:var(--muted);background:#faf9f6}
+  @media(max-width:720px){.day-filter-grid{grid-template-columns:1fr}.day-filter-panel{padding:12px}}
+  @media print{.day-filter-panel,.day-filter-empty{display:none!important}}
 
 </style>
 </head>
@@ -281,6 +293,27 @@
     <div class="picker-row">
       <button class="picker-btn active" id="dayShowAllBtn" type="button">Все занятия</button>
       <button class="picker-btn" id="dayProblemsBtn" type="button">⚠ Только проблемные</button>
+    </div>
+    <div class="day-filter-panel" id="dayFilterPanel">
+      <div class="day-filter-title">Фильтры расписания</div>
+      <div class="day-filter-grid">
+        <div class="day-filter-field">
+          <label for="dayFilterTime">Время</label>
+          <select id="dayFilterTime"><option value="">Все время</option></select>
+        </div>
+        <div class="day-filter-field">
+          <label for="dayFilterTeacher">Преподаватель</label>
+          <select id="dayFilterTeacher"><option value="">Все преподаватели</option></select>
+        </div>
+        <div class="day-filter-field">
+          <label for="dayFilterGroup">Группа</label>
+          <select id="dayFilterGroup"><option value="">Все группы</option></select>
+        </div>
+      </div>
+      <div class="day-filter-actions">
+        <button class="day-filter-reset" id="dayFilterReset" type="button">✕ Сбросить фильтры</button>
+        <span class="day-filter-result" id="dayFilterResult">Сначала выберите день.</span>
+      </div>
     </div>
     <div class="hint" style="margin-top:8px;">
       Показываются все курсы, группы, преподаватели и аудитории выбранного дня. 
@@ -5898,6 +5931,167 @@ relabelRoot(document.getElementById('status'));
       return previousCard(r);
     };
   }
+})();
+</script>
+<!-- Правка 19: языковая группа 202_1/3 отображается как 2И_арабский -->
+<script>
+(function(){
+  'use strict';
+  const subgroupCode = '202_1/3';
+  const groupName = '2И_арабский';
+
+  /* Внутренний ключ сохраняем: по нему открывается полное расписание группы.
+     Меняем только понятное пользователю название во всех режимах просмотра. */
+  if(typeof GROUP_LABELS !== 'undefined'){
+    GROUP_LABELS[subgroupCode] = groupName;
+  }
+
+  function relabelSubgroup(root){
+    if(!root) return root;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const nodes = [];
+    while(walker.nextNode()) nodes.push(walker.currentNode);
+    nodes.forEach(node => {
+      let value = node.nodeValue || '';
+      value = value.replace(/2 курс\s*[—-]\s*арабский\s*[—-]\s*(?:языковая )?группа\s+202_1\/3/gi, groupName);
+      value = value.replace(/2 курс\s*[—-]\s*арабский\s*[—-]\s*языковая подгруппа 1/gi, groupName);
+      value = value.replace(/\b202_1\/3\b/g, groupName);
+      node.nodeValue = value;
+    });
+    return root;
+  }
+
+  if(typeof card === 'function'){
+    const previousCard = card;
+    card = function(r){
+      return relabelSubgroup(previousCard(r));
+    };
+  }
+
+  /* Вкладка «По дням» сначала объединяет строки, а затем полностью
+     перерисовывает контейнер. Повторяем замену после этой перерисовки. */
+  if(typeof renderDayOverview === 'function'){
+    const previousRenderDayOverview = renderDayOverview;
+    renderDayOverview = function(day){
+      const result = previousRenderDayOverview(day);
+      if(day === 'Ср'){
+        relabelSubgroup(document.getElementById('results'));
+        relabelSubgroup(document.getElementById('status'));
+      }
+      return result;
+    };
+  }
+
+  try{ if(typeof buildGroupItems === 'function') buildGroupItems(); }catch(e){}
+  try{ if(typeof buildBrowseList === 'function') buildBrowseList(); }catch(e){}
+
+  relabelSubgroup(document.getElementById('results'));
+  relabelSubgroup(document.getElementById('status'));
+
+  const help = document.getElementById('modeHelp');
+  if(help){
+    help.textContent = help.textContent.replace(/202_1\/3/g, groupName);
+  }
+})();
+</script>
+<!-- Правка 20: комбинируемые фильтры во вкладке «По дням» -->
+<script>
+(function(){
+  'use strict';
+  const dayBox = document.getElementById('searchBoxDay');
+  if(!dayBox || typeof renderDayOverview !== 'function') return;
+  const panel = document.getElementById('dayFilterPanel');
+  if(!panel) return;
+
+  const timeSelect = panel.querySelector('#dayFilterTime');
+  const teacherSelect = panel.querySelector('#dayFilterTeacher');
+  const groupSelect = panel.querySelector('#dayFilterGroup');
+  const result = panel.querySelector('#dayFilterResult');
+  const reset = panel.querySelector('#dayFilterReset');
+  let empty = null;
+
+  const clean = value => String(value || '').replace(/\s+/g,' ').trim();
+  const collator = new Intl.Collator('ru',{sensitivity:'base',numeric:true});
+
+  function setOptions(select, values, firstLabel){
+    const previous = select.value;
+    const unique = [...new Set(values.map(clean).filter(Boolean))].sort(collator.compare);
+    select.innerHTML = '<option value="">'+firstLabel+'</option>' + unique.map(value =>
+      '<option value="'+escapeAttr(value)+'">'+value.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</option>'
+    ).join('');
+    if(unique.includes(previous)) select.value = previous;
+  }
+
+  function cardTime(cardEl){
+    const section = cardEl.closest('.day-time-section');
+    return clean(section && section.querySelector('.day-time-heading span')?.textContent);
+  }
+  function cardTeachers(cardEl){
+    return [...cardEl.querySelectorAll('.teacher-link')].map(el=>clean(el.textContent));
+  }
+  function cardGroups(cardEl){
+    return [...cardEl.querySelectorAll('.group-code')]
+      .flatMap(el=>clean(el.textContent).split(';').map(clean))
+      .filter(Boolean);
+  }
+
+  function populateFilters(){
+    const cards = [...document.querySelectorAll('#results .day-time-section .card')];
+    setOptions(timeSelect, cards.map(cardTime), 'Все время');
+    setOptions(teacherSelect, cards.flatMap(cardTeachers), 'Все преподаватели');
+    setOptions(groupSelect, cards.flatMap(cardGroups), 'Все группы');
+  }
+
+  function applyFilters(){
+    const cards = [...document.querySelectorAll('#results .day-time-section .card')];
+    const selectedTime = clean(timeSelect.value);
+    const selectedTeacher = clean(teacherSelect.value);
+    const selectedGroup = clean(groupSelect.value);
+    let shown = 0;
+
+    cards.forEach(cardEl => {
+      const matchTime = !selectedTime || cardTime(cardEl) === selectedTime;
+      const matchTeacher = !selectedTeacher || cardTeachers(cardEl).includes(selectedTeacher);
+      const matchGroup = !selectedGroup || cardGroups(cardEl).includes(selectedGroup);
+      const visible = matchTime && matchTeacher && matchGroup;
+      cardEl.style.display = visible ? '' : 'none';
+      if(visible) shown++;
+    });
+
+    document.querySelectorAll('#results .day-time-section').forEach(section => {
+      const visibleCards = [...section.querySelectorAll('.card')].filter(cardEl=>cardEl.style.display !== 'none');
+      section.style.display = visibleCards.length ? '' : 'none';
+      const counter = section.querySelector('.day-time-heading small');
+      if(counter) counter.textContent = visibleCards.length + ' ' + (visibleCards.length === 1 ? 'карточка' : (visibleCards.length < 5 ? 'карточки' : 'карточек'));
+    });
+
+    if(empty) empty.remove();
+    empty = null;
+    if(cards.length && shown === 0){
+      empty = document.createElement('div');
+      empty.className = 'day-filter-empty';
+      empty.textContent = 'По выбранным условиям занятий не найдено.';
+      document.getElementById('results').appendChild(empty);
+    }
+    const active = [selectedTime,selectedTeacher,selectedGroup].filter(Boolean).length;
+    result.textContent = cards.length
+      ? 'Показано карточек: ' + shown + ' из ' + cards.length + (active ? ' · выбрано условий: ' + active : '')
+      : 'Для выбранного дня карточек нет.';
+  }
+
+  [timeSelect,teacherSelect,groupSelect].forEach(select=>select.addEventListener('change',applyFilters));
+  reset.addEventListener('click',()=>{
+    timeSelect.value=''; teacherSelect.value=''; groupSelect.value='';
+    applyFilters();
+  });
+
+  const previousRenderDayOverview = renderDayOverview;
+  renderDayOverview = function(day){
+    const output = previousRenderDayOverview(day);
+    populateFilters();
+    applyFilters();
+    return output;
+  };
 })();
 </script>
 </body>
