@@ -284,6 +284,27 @@
     <input type="text" id="q" placeholder="Начните печатать…" autocomplete="off">
     <div id="suggestList" class="suggest-list"></div>
     <button class="clear-btn" id="clearBtn">✕ Показать заново</button>
+    <div class="day-filter-panel" id="scheduleFilterPanel">
+      <div class="day-filter-title">Фильтры расписания</div>
+      <div class="day-filter-grid">
+        <div class="day-filter-field">
+          <label for="scheduleFilterTime">Время</label>
+          <select id="scheduleFilterTime"><option value="">Все время</option></select>
+        </div>
+        <div class="day-filter-field">
+          <label for="scheduleFilterTeacher">Преподаватель</label>
+          <select id="scheduleFilterTeacher"><option value="">Все преподаватели</option></select>
+        </div>
+        <div class="day-filter-field">
+          <label for="scheduleFilterGroup">Группа</label>
+          <select id="scheduleFilterGroup"><option value="">Все группы</option></select>
+        </div>
+      </div>
+      <div class="day-filter-actions">
+        <button class="day-filter-reset" id="scheduleFilterReset" type="button">✕ Сбросить фильтры</button>
+        <span class="day-filter-result" id="scheduleFilterResult">Сначала выберите расписание.</span>
+      </div>
+    </div>
   </div>
 
 
@@ -6916,6 +6937,131 @@ relabelRoot(document.getElementById('status'));
   try{ if(typeof buildGroupItems === 'function') buildGroupItems(); }catch(e){}
   try{ if(typeof buildBrowseList === 'function') buildBrowseList(); }catch(e){}
   try{ if(typeof showEmpty === 'function') showEmpty(); }catch(e){}
+})();
+</script>
+<!-- Правка 36: единые комбинируемые фильтры во всех основных вкладках -->
+<script>
+(function(){
+  'use strict';
+  if(typeof showSchedule !== 'function') return;
+
+  const panel = document.getElementById('scheduleFilterPanel');
+  if(!panel) return;
+  const timeSelect = document.getElementById('scheduleFilterTime');
+  const teacherSelect = document.getElementById('scheduleFilterTeacher');
+  const groupSelect = document.getElementById('scheduleFilterGroup');
+  const resetButton = document.getElementById('scheduleFilterReset');
+  const resultText = document.getElementById('scheduleFilterResult');
+  const collator = new Intl.Collator('ru',{sensitivity:'base',numeric:true});
+  let emptyMessage = null;
+
+  const clean = value => String(value == null ? '' : value).replace(/\s+/g,' ').trim();
+  const escapeText = value => clean(value)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+  function setOptions(select,values,firstLabel){
+    const previous = select.value;
+    const unique = [...new Set(values.map(clean).filter(Boolean))].sort(collator.compare);
+    select.innerHTML = '<option value="">'+firstLabel+'</option>' + unique.map(value =>
+      '<option value="'+escapeAttr(value)+'">'+escapeText(value)+'</option>'
+    ).join('');
+    select.value = unique.includes(previous) ? previous : '';
+  }
+
+  function cards(){
+    return [...document.querySelectorAll('#results .day-group .card')];
+  }
+  function cardTime(cardElement){
+    return clean(cardElement.querySelector('.time')?.textContent);
+  }
+  function cardTeachers(cardElement){
+    return [...cardElement.querySelectorAll('.teacher-link')].map(element=>clean(element.textContent)).filter(Boolean);
+  }
+  function cardGroups(cardElement){
+    return [...cardElement.querySelectorAll('.group-code')].map(element=>clean(element.textContent)).filter(Boolean);
+  }
+
+  function populateFilters(){
+    const list = cards();
+    setOptions(timeSelect,list.map(cardTime),'Все время');
+    setOptions(teacherSelect,list.flatMap(cardTeachers),'Все преподаватели');
+    setOptions(groupSelect,list.flatMap(cardGroups),'Все группы');
+  }
+
+  function pluralCards(number){
+    const mod100 = number % 100;
+    const mod10 = number % 10;
+    if(mod100 >= 11 && mod100 <= 14) return 'карточек';
+    if(mod10 === 1) return 'карточка';
+    if(mod10 >= 2 && mod10 <= 4) return 'карточки';
+    return 'карточек';
+  }
+
+  function applyFilters(){
+    const list = cards();
+    const selectedTime = clean(timeSelect.value);
+    const selectedTeacher = clean(teacherSelect.value);
+    const selectedGroup = clean(groupSelect.value);
+    let shown = 0;
+
+    list.forEach(cardElement => {
+      const visible = (!selectedTime || cardTime(cardElement) === selectedTime) &&
+        (!selectedTeacher || cardTeachers(cardElement).includes(selectedTeacher)) &&
+        (!selectedGroup || cardGroups(cardElement).includes(selectedGroup));
+      cardElement.style.display = visible ? '' : 'none';
+      if(visible) shown++;
+    });
+
+    document.querySelectorAll('#results .day-group').forEach(dayGroup => {
+      const visibleCards = [...dayGroup.querySelectorAll('.card')]
+        .filter(cardElement=>cardElement.style.display !== 'none');
+      dayGroup.style.display = visibleCards.length ? '' : 'none';
+    });
+
+    if(emptyMessage) emptyMessage.remove();
+    emptyMessage = null;
+    if(list.length && shown === 0){
+      emptyMessage = document.createElement('div');
+      emptyMessage.className = 'day-filter-empty';
+      emptyMessage.textContent = 'По выбранным условиям занятий не найдено.';
+      document.getElementById('results').appendChild(emptyMessage);
+    }
+
+    const active = [selectedTime,selectedTeacher,selectedGroup].filter(Boolean).length;
+    resultText.textContent = list.length
+      ? 'Показано: '+shown+' '+pluralCards(shown)+' из '+list.length+(active ? ' · выбрано условий: '+active : '')
+      : 'Сначала выберите расписание.';
+  }
+
+  [timeSelect,teacherSelect,groupSelect].forEach(select=>select.addEventListener('change',applyFilters));
+  resetButton.addEventListener('click',()=>{
+    timeSelect.value = '';
+    teacherSelect.value = '';
+    groupSelect.value = '';
+    applyFilters();
+  });
+
+  const previousShowSchedule = showSchedule;
+  showSchedule = function(key){
+    const output = previousShowSchedule(key);
+    populateFilters();
+    applyFilters();
+    return output;
+  };
+
+  if(typeof switchMode === 'function'){
+    const previousSwitchMode = switchMode;
+    switchMode = function(mode){
+      const output = previousSwitchMode(mode);
+      if(mode !== 'day' && mode !== 'room'){
+        timeSelect.value = '';
+        teacherSelect.value = '';
+        groupSelect.value = '';
+        resultText.textContent = 'Сначала выберите расписание.';
+      }
+      return output;
+    };
+  }
 })();
 </script>
 </body>
