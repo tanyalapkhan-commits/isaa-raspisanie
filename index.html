@@ -247,13 +247,16 @@
     padding:20px; border:1px dashed var(--line); border-radius:12px;
     color:var(--muted); text-align:center; background:#faf9f6;
   }
-  .day-filter-panel{margin-top:14px;padding:14px;border:1px solid var(--line);border-radius:12px;background:#faf9f6}
-  .day-filter-title{margin-bottom:10px;font-size:15px;font-weight:800;color:var(--ink)}
+  .day-filter-panel{margin-top:14px;padding:16px;border:2px solid var(--line);border-radius:14px;background:linear-gradient(180deg,#fff 0%,#faf7f0 100%);box-shadow:0 2px 0 var(--line)}
+  .day-filter-title{margin-bottom:12px;font-size:18px;font-weight:800;color:var(--accent)}
   .day-filter-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
-  .schedule-filter-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
-  .day-filter-field{display:flex;flex-direction:column;gap:5px}
-  .day-filter-field label{font-size:13px;font-weight:700;color:var(--muted)}
-  .day-filter-field select{width:100%;min-height:42px;padding:8px 34px 8px 10px;border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--ink);font:inherit;font-size:15px}
+  .schedule-filter-grid{grid-template-columns:repeat(auto-fit,minmax(165px,1fr))}
+  .day-filter-field{display:flex;flex-direction:column;gap:6px;padding:10px;border:1px solid var(--line);border-radius:10px;background:#fff}
+  .day-filter-field label{font-size:14px;font-weight:700;color:var(--muted);margin:0}
+  .day-filter-field select{width:100%;min-height:44px;padding:8px 34px 8px 11px;border:2px solid var(--line);border-radius:9px;background:#fff;color:var(--ink);font:inherit;font-size:16px;cursor:pointer}
+  .day-filter-field select:hover{border-color:var(--accent)}
+  .day-filter-field select:focus{outline:3px solid var(--accent-soft);border-color:var(--accent)}
+  .day-filter-field select:disabled{cursor:not-allowed;opacity:.55;background:#f4f1eb}
   .day-filter-actions{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-top:11px}
   .day-filter-reset{border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--ink);padding:8px 12px;font:inherit;font-weight:700;cursor:pointer}
   .day-filter-result{font-size:14px;color:var(--muted)}
@@ -297,6 +300,10 @@
         <div class="day-filter-field" id="schedulePrimaryField">
           <label for="scheduleFilterPrimary" id="scheduleFilterPrimaryLabel">Преподаватель</label>
           <select id="scheduleFilterPrimary"><option value="">Выберите преподавателя</option></select>
+        </div>
+        <div class="day-filter-field">
+          <label for="scheduleFilterDay">День недели</label>
+          <select id="scheduleFilterDay"><option value="">Все дни</option></select>
         </div>
         <div class="day-filter-field">
           <label for="scheduleFilterTime">Время</label>
@@ -7088,6 +7095,7 @@ relabelRoot(document.getElementById('status'));
 
   const primary = panel.querySelector('#scheduleFilterPrimary');
   const primaryLabel = panel.querySelector('#scheduleFilterPrimaryLabel');
+  const daySelect = panel.querySelector('#scheduleFilterDay');
   const timeSelect = panel.querySelector('#scheduleFilterTime');
   const teacherSelect = panel.querySelector('#scheduleFilterTeacher');
   const teacherField = teacherSelect.closest('.day-filter-field');
@@ -7100,9 +7108,10 @@ relabelRoot(document.getElementById('status'));
   const clean = value => String(value == null ? '' : value).replace(/\s+/g,' ').trim();
   const safe = value => clean(value).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
-  function setOptions(select, values, firstLabel, keepValue=true){
+  function setOptions(select, values, firstLabel, keepValue=true, sortValues=true){
     const previous = keepValue ? select.value : '';
-    const unique = [...new Set(values.map(clean).filter(Boolean))].sort(collator.compare);
+    const unique = [...new Set(values.map(clean).filter(Boolean))];
+    if(sortValues) unique.sort(collator.compare);
     select.innerHTML = '<option value="">'+safe(firstLabel)+'</option>' + unique.map(value =>
       '<option value="'+escapeAttr(value)+'">'+safe(value)+'</option>'
     ).join('');
@@ -7133,23 +7142,30 @@ relabelRoot(document.getElementById('status'));
   }
 
   function cards(){ return [...document.querySelectorAll('#results .day-group .card')]; }
+  function cardDay(card){ return clean(card.closest('.day-group')?.querySelector('.day-title')?.textContent); }
   function cardTime(card){ return clean(card.querySelector('.time')?.textContent); }
   function cardTeachers(card){ return [...card.querySelectorAll('.teacher-link')].map(el=>clean(el.textContent)).filter(Boolean); }
   function cardGroups(card){ return [...card.querySelectorAll('.group-code')].map(el=>clean(el.textContent)).filter(Boolean); }
 
   function resetSecondary(){
+    setOptions(daySelect,[],'Все дни',false);
     setOptions(timeSelect,[],'Все время',false);
     setOptions(teacherSelect,[],'Все преподаватели',false);
     setOptions(groupSelect,[],'Все группы',false);
-    timeSelect.disabled = teacherSelect.disabled = groupSelect.disabled = !primary.value;
+    daySelect.disabled = timeSelect.disabled = teacherSelect.disabled = groupSelect.disabled = !primary.value;
   }
 
   function populateSecondary(){
     const list = cards();
+    const days = [...new Set(list.map(cardDay).filter(Boolean))].sort((a,b)=>{
+      const order=['Понедельник','Вторник','Среда','Четверг','Пятница','Суббота','Требует уточнения'];
+      return order.indexOf(a)-order.indexOf(b);
+    });
+    setOptions(daySelect,days,'Все дни',false,false);
     setOptions(timeSelect,list.map(cardTime),'Все время',false);
     setOptions(teacherSelect,list.flatMap(cardTeachers),'Все преподаватели',false);
     setOptions(groupSelect,list.flatMap(cardGroups),'Все группы',false);
-    timeSelect.disabled = teacherSelect.disabled = groupSelect.disabled = false;
+    daySelect.disabled = timeSelect.disabled = teacherSelect.disabled = groupSelect.disabled = false;
   }
 
   function plural(number){
@@ -7159,10 +7175,10 @@ relabelRoot(document.getElementById('status'));
 
   function applyFilters(){
     const list=cards();
-    const time=clean(timeSelect.value), teacher=clean(teacherSelect.value), group=clean(groupSelect.value);
+    const day=clean(daySelect.value), time=clean(timeSelect.value), teacher=clean(teacherSelect.value), group=clean(groupSelect.value);
     let shown=0;
     list.forEach(card=>{
-      const visible=(!time||cardTime(card)===time)&&(!teacher||cardTeachers(card).includes(teacher))&&(!group||cardGroups(card).includes(group));
+      const visible=(!day||cardDay(card)===day)&&(!time||cardTime(card)===time)&&(!teacher||cardTeachers(card).includes(teacher))&&(!group||cardGroups(card).includes(group));
       card.style.display=visible?'':'none';
       if(visible) shown++;
     });
@@ -7177,7 +7193,7 @@ relabelRoot(document.getElementById('status'));
       emptyMessage.textContent='По выбранным условиям занятий не найдено.';
       document.getElementById('results').appendChild(emptyMessage);
     }
-    const active=[time,teacher,group].filter(Boolean).length;
+    const active=[day,time,teacher,group].filter(Boolean).length;
     resultText.textContent=list.length?'Показано: '+shown+' '+plural(shown)+' из '+list.length+(active?' · дополнительных условий: '+active:''):modeMeta()[1]+'.';
   }
 
@@ -7187,7 +7203,7 @@ relabelRoot(document.getElementById('status'));
     populateSecondary();
     applyFilters();
   });
-  [timeSelect,teacherSelect,groupSelect].forEach(select=>select.addEventListener('change',applyFilters));
+  [daySelect,timeSelect,teacherSelect,groupSelect].forEach(select=>select.addEventListener('change',applyFilters));
   resetButton.addEventListener('click',()=>{
     if(!primary.value){ resetSecondary(); return; }
     populateSecondary();
@@ -7196,7 +7212,6 @@ relabelRoot(document.getElementById('status'));
 
   const priorSwitchMode=switchMode;
   switchMode=function(mode){
-    if(mode==='student') return;
     const output=priorSwitchMode(mode);
     if(mode!=='day'&&mode!=='room') fillPrimary();
     return output;
@@ -7216,6 +7231,198 @@ relabelRoot(document.getElementById('status'));
   document.getElementById('status').addEventListener('click',groupClick,true);
 
   fillPrimary();
+})();
+</script>
+<!-- Правка 38: полностью независимые фильтры, выбираемые в любом порядке -->
+<script>
+(function(){
+  'use strict';
+  if(typeof PUBLIC_DATA === 'undefined' || typeof card !== 'function') return;
+
+  const previousPanel=document.getElementById('scheduleFilterPanel');
+  if(!previousPanel) return;
+  const panel=previousPanel.cloneNode(true);
+  previousPanel.replaceWith(panel);
+
+  const primary=panel.querySelector('#scheduleFilterPrimary');
+  const primaryLabel=panel.querySelector('#scheduleFilterPrimaryLabel');
+  const daySelect=panel.querySelector('#scheduleFilterDay');
+  const timeSelect=panel.querySelector('#scheduleFilterTime');
+  const teacherSelect=panel.querySelector('#scheduleFilterTeacher');
+  const teacherField=teacherSelect.closest('.day-filter-field');
+  const groupSelect=panel.querySelector('#scheduleFilterGroup');
+  const resetButton=panel.querySelector('#scheduleFilterReset');
+  const resultText=panel.querySelector('#scheduleFilterResult');
+  const resultsEl=document.getElementById('results');
+  const statusEl=document.getElementById('status');
+  const printTitle=document.getElementById('printTitle');
+  const pdfButton=document.getElementById('pdfBtn');
+  const collator=new Intl.Collator('ru',{sensitivity:'base',numeric:true});
+
+  const clean=value=>String(value==null?'':value).replace(/\s+/g,' ').trim();
+  const safe=value=>clean(value).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+  function optionMarkup(value,label){
+    return '<option value="'+escapeAttr(value)+'">'+safe(label)+'</option>';
+  }
+  function fillSelect(select,items,placeholder){
+    select.innerHTML='<option value="">'+safe(placeholder)+'</option>'+items.map(item=>
+      optionMarkup(typeof item==='string'?item:item.value,typeof item==='string'?item:item.label)
+    ).join('');
+    select.disabled=false;
+  }
+  function modeMeta(){
+    return ({
+      teacher:['Преподаватель','Любой преподаватель'],
+      student:['Группа','Любая группа'],
+      course:['Курс','Любой курс'],
+      discipline:['Дисциплина','Любая дисциплина'],
+      department:['Кафедра','Любая кафедра']
+    })[MODE]||['Преподаватель','Любой преподаватель'];
+  }
+  function primaryItems(){
+    return currentItems().map(item=>({value:item.key,label:item.display}));
+  }
+  function groupItems(){
+    return GROUP_ITEMS.map(item=>({value:item.code,label:item.label||GROUP_LABELS[item.code]||item.code}));
+  }
+  function initializeFilters(){
+    const meta=modeMeta();
+    primaryLabel.textContent=meta[0];
+    fillSelect(primary,primaryItems(),meta[1]);
+    const availableDays=DAY_ORDER.filter(day=>PUBLIC_DATA.some(row=>row.day===day));
+    const unresolved=[...new Set(PUBLIC_DATA.map(row=>clean(row.day)).filter(day=>day&&!DAY_ORDER.includes(day)))];
+    fillSelect(daySelect,[...availableDays.map(day=>({value:day,label:dayFull(day)})),...unresolved.map(day=>({value:day,label:'Требует уточнения'}))],'Все дни');
+    const times=[...new Set(PUBLIC_DATA.map(row=>clean(row.time)).filter(Boolean))].sort((a,b)=>timeOrder(a)-timeOrder(b)||collator.compare(a,b));
+    fillSelect(timeSelect,times,'Все время');
+    fillSelect(teacherSelect,[...TEACHERS].sort(collator.compare),'Все преподаватели');
+    fillSelect(groupSelect,groupItems(),'Все группы');
+    teacherField.style.display=MODE==='teacher'?'none':'';
+    resultText.textContent='Можно начать с любого фильтра.';
+  }
+
+  function teacherMatches(row,name){
+    if(!name) return true;
+    const names=[row.teacher,...(Array.isArray(row.teachers)?row.teachers:[]),...(Array.isArray(row.joint_readers)?row.joint_readers:[])].filter(Boolean);
+    return names.includes(name);
+  }
+  function primaryMatches(row,value){
+    if(!value) return true;
+    if(MODE==='teacher') return teacherMatches(row,value);
+    if(MODE==='course') return clean(row.course)===value;
+    if(MODE==='discipline') return disciplineKey(row.discipline)===value;
+    if(MODE==='department') return teacherDepartments(row.teacher).includes(value);
+    return true;
+  }
+  function selectedRows(){
+    const main=primary.value;
+    const day=daySelect.value;
+    const time=timeSelect.value;
+    const teacher=teacherSelect.value;
+    const group=groupSelect.value;
+    const mainGroupSet=MODE==='student'&&main?new Set(fullGroupMatches(main)):null;
+    const groupSet=group?new Set(fullGroupMatches(group)):null;
+    return PUBLIC_DATA.filter(row=>
+      (mainGroupSet?mainGroupSet.has(row):primaryMatches(row,main))&&
+      (!day||clean(row.day)===day)&&
+      (!time||clean(row.time)===time)&&
+      teacherMatches(row,teacher)&&
+      (!groupSet||groupSet.has(row))
+    );
+  }
+  function deduplicate(rows){
+    const seen=new Set();
+    return rows.filter(row=>{
+      const key=row.rotation_id
+        ? 'rotation|'+row.rotation_id
+        : [row.day,row.time,row.discipline,row.group,row.room_hint,row.teacher].map(clean).join('|');
+      if(seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+  function activeLabels(){
+    return [primary,daySelect,timeSelect,teacherSelect,groupSelect]
+      .filter(select=>select.value)
+      .map(select=>select.options[select.selectedIndex]?.textContent||select.value);
+  }
+  function plural(number){
+    const a=number%100,b=number%10;
+    return a>=11&&a<=14?'занятий':b===1?'занятие':b>=2&&b<=4?'занятия':'занятий';
+  }
+  function render(){
+    const labels=activeLabels();
+    if(!labels.length){
+      showEmpty();
+      resultText.textContent='Можно начать с любого фильтра.';
+      return;
+    }
+    const rows=deduplicate(selectedRows());
+    resultsEl.innerHTML='';
+    statusEl.innerHTML=rows.length
+      ? '<b>'+safe(labels.join(' · '))+'</b>'
+      : 'По выбранным условиям занятий не найдено.';
+    printTitle.textContent='Расписание: '+labels.join(' · ')+' — осень 2026–2027, ИСАА МГУ';
+    pdfButton.classList.toggle('show',rows.length>0);
+    if(!rows.length){
+      resultsEl.innerHTML='<div class="day-filter-empty">Попробуйте изменить или сбросить один из фильтров.</div>';
+      resultText.textContent='Ничего не найдено · выбрано условий: '+labels.length;
+      return;
+    }
+    const byDay=new Map();
+    rows.forEach(row=>{
+      const day=clean(row.day)||'уточняется';
+      if(!byDay.has(day)) byDay.set(day,[]);
+      byDay.get(day).push(row);
+    });
+    const ordered=[...DAY_ORDER.filter(day=>byDay.has(day)),...[...byDay.keys()].filter(day=>!DAY_ORDER.includes(day))];
+    ordered.forEach(day=>{
+      const section=document.createElement('div');
+      section.className='day-group';
+      const title=document.createElement('div');
+      title.className='day-title';
+      title.textContent=DAY_ORDER.includes(day)?dayFull(day):'Требует уточнения';
+      section.appendChild(title);
+      byDay.get(day).sort((a,b)=>timeOrder(a.time)-timeOrder(b.time)||collator.compare(clean(a.discipline),clean(b.discipline)));
+      byDay.get(day).forEach(row=>section.appendChild(card(Object.assign({},row,{_showCourse:true}))));
+      resultsEl.appendChild(section);
+    });
+    resultText.textContent='Найдено: '+rows.length+' '+plural(rows.length)+' · выбрано условий: '+labels.length;
+  }
+
+  [primary,daySelect,timeSelect,teacherSelect,groupSelect].forEach(select=>select.addEventListener('change',render));
+  resetButton.addEventListener('click',()=>{
+    [primary,daySelect,timeSelect,teacherSelect,groupSelect].forEach(select=>select.value='');
+    render();
+  });
+
+  function enforceActiveTab(mode){
+    const idByMode={teacher:'modeTeacher',student:'modeStudentPersonal',course:'modeCourse',discipline:'modeDiscipline',department:'modeDepartment',day:'modeDay',room:'modeRoom'};
+    document.querySelectorAll('.mode-toggle .mode-btn').forEach(button=>button.classList.remove('active'));
+    const activeButton=document.getElementById(idByMode[mode]);
+    if(activeButton) activeButton.classList.add('active');
+  }
+
+  const priorSwitch=switchMode;
+  switchMode=function(mode){
+    const output=priorSwitch(mode);
+    enforceActiveTab(mode);
+    if(mode!=='day'&&mode!=='room') initializeFilters();
+    return output;
+  };
+
+  const modeBar=document.querySelector('.mode-toggle');
+  if(modeBar){
+    modeBar.addEventListener('click',event=>{
+      const button=event.target.closest('.mode-btn');
+      if(!button||!modeBar.contains(button)) return;
+      document.querySelectorAll('.mode-toggle .mode-btn').forEach(item=>item.classList.remove('active'));
+      button.classList.add('active');
+    });
+  }
+
+  initializeFilters();
+  showEmpty();
 })();
 </script>
 </body>
