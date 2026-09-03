@@ -250,6 +250,7 @@
   .day-filter-panel{margin-top:14px;padding:14px;border:1px solid var(--line);border-radius:12px;background:#faf9f6}
   .day-filter-title{margin-bottom:10px;font-size:15px;font-weight:800;color:var(--ink)}
   .day-filter-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+  .schedule-filter-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
   .day-filter-field{display:flex;flex-direction:column;gap:5px}
   .day-filter-field label{font-size:13px;font-weight:700;color:var(--muted)}
   .day-filter-field select{width:100%;min-height:42px;padding:8px 34px 8px 10px;border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--ink);font:inherit;font-size:15px}
@@ -259,6 +260,12 @@
   .day-filter-empty{margin:18px 0;padding:22px;border:1px dashed var(--line);border-radius:12px;text-align:center;color:var(--muted);background:#faf9f6}
   @media(max-width:720px){.day-filter-grid{grid-template-columns:1fr}.day-filter-panel{padding:12px}}
   @media print{.day-filter-panel,.day-filter-empty{display:none!important}}
+  #modeStudent{display:none!important}
+  #searchBoxNormal>#qLabel,
+  #searchBoxNormal>#q,
+  #searchBoxNormal>#suggestList,
+  #searchBoxNormal>#clearBtn,
+  #browseBlock{display:none!important}
 
 </style>
 </head>
@@ -277,7 +284,7 @@
     <button class="mode-btn" id="modeRoom" type="button">Аудитория</button>
   </div>
 
-  <div id="modeHelp" class="hint" style="margin:-6px 0 14px;">Выберите режим просмотра: преподаватель, группа, курс, дисциплина, кафедра, день недели или аудитория.</div>
+  <div id="modeHelp" class="hint" style="margin:-6px 0 14px;">Выберите режим просмотра: преподаватель, курс, дисциплина, кафедра, день недели или аудитория.</div>
 
   <div class="search-box" id="searchBoxNormal">
     <label id="qLabel" for="q">Впишите свою фамилию</label>
@@ -286,7 +293,11 @@
     <button class="clear-btn" id="clearBtn">✕ Показать заново</button>
     <div class="day-filter-panel" id="scheduleFilterPanel">
       <div class="day-filter-title">Фильтры расписания</div>
-      <div class="day-filter-grid">
+      <div class="day-filter-grid schedule-filter-grid">
+        <div class="day-filter-field" id="schedulePrimaryField">
+          <label for="scheduleFilterPrimary" id="scheduleFilterPrimaryLabel">Преподаватель</label>
+          <select id="scheduleFilterPrimary"><option value="">Выберите преподавателя</option></select>
+        </div>
         <div class="day-filter-field">
           <label for="scheduleFilterTime">Время</label>
           <select id="scheduleFilterTime"><option value="">Все время</option></select>
@@ -7062,6 +7073,149 @@ relabelRoot(document.getElementById('status'));
       return output;
     };
   }
+})();
+</script>
+<!-- Правка 37: фильтры без текстового поиска и без отдельной вкладки групп -->
+<script>
+(function(){
+  'use strict';
+  if(typeof showSchedule !== 'function' || typeof switchMode !== 'function') return;
+
+  const oldPanel = document.getElementById('scheduleFilterPanel');
+  if(!oldPanel) return;
+  const panel = oldPanel.cloneNode(true);
+  oldPanel.replaceWith(panel);
+
+  const primary = panel.querySelector('#scheduleFilterPrimary');
+  const primaryLabel = panel.querySelector('#scheduleFilterPrimaryLabel');
+  const timeSelect = panel.querySelector('#scheduleFilterTime');
+  const teacherSelect = panel.querySelector('#scheduleFilterTeacher');
+  const teacherField = teacherSelect.closest('.day-filter-field');
+  const groupSelect = panel.querySelector('#scheduleFilterGroup');
+  const resetButton = panel.querySelector('#scheduleFilterReset');
+  const resultText = panel.querySelector('#scheduleFilterResult');
+  const collator = new Intl.Collator('ru',{sensitivity:'base',numeric:true});
+  let emptyMessage = null;
+
+  const clean = value => String(value == null ? '' : value).replace(/\s+/g,' ').trim();
+  const safe = value => clean(value).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+  function setOptions(select, values, firstLabel, keepValue=true){
+    const previous = keepValue ? select.value : '';
+    const unique = [...new Set(values.map(clean).filter(Boolean))].sort(collator.compare);
+    select.innerHTML = '<option value="">'+safe(firstLabel)+'</option>' + unique.map(value =>
+      '<option value="'+escapeAttr(value)+'">'+safe(value)+'</option>'
+    ).join('');
+    select.value = unique.includes(previous) ? previous : '';
+  }
+
+  function modeMeta(){
+    const map = {
+      teacher:['Преподаватель','Выберите преподавателя'],
+      course:['Курс','Выберите курс'],
+      discipline:['Дисциплина','Выберите дисциплину'],
+      department:['Кафедра','Выберите кафедру']
+    };
+    return map[MODE] || map.teacher;
+  }
+
+  function fillPrimary(){
+    const meta = modeMeta();
+    primaryLabel.textContent = meta[0];
+    const items = currentItems();
+    primary.innerHTML = '<option value="">'+safe(meta[1])+'</option>' + items.map(item =>
+      '<option value="'+escapeAttr(item.key)+'">'+safe(item.display)+'</option>'
+    ).join('');
+    teacherField.style.display = MODE === 'teacher' ? 'none' : '';
+    primary.value = '';
+    resetSecondary();
+    resultText.textContent = meta[1]+'.';
+  }
+
+  function cards(){ return [...document.querySelectorAll('#results .day-group .card')]; }
+  function cardTime(card){ return clean(card.querySelector('.time')?.textContent); }
+  function cardTeachers(card){ return [...card.querySelectorAll('.teacher-link')].map(el=>clean(el.textContent)).filter(Boolean); }
+  function cardGroups(card){ return [...card.querySelectorAll('.group-code')].map(el=>clean(el.textContent)).filter(Boolean); }
+
+  function resetSecondary(){
+    setOptions(timeSelect,[],'Все время',false);
+    setOptions(teacherSelect,[],'Все преподаватели',false);
+    setOptions(groupSelect,[],'Все группы',false);
+    timeSelect.disabled = teacherSelect.disabled = groupSelect.disabled = !primary.value;
+  }
+
+  function populateSecondary(){
+    const list = cards();
+    setOptions(timeSelect,list.map(cardTime),'Все время',false);
+    setOptions(teacherSelect,list.flatMap(cardTeachers),'Все преподаватели',false);
+    setOptions(groupSelect,list.flatMap(cardGroups),'Все группы',false);
+    timeSelect.disabled = teacherSelect.disabled = groupSelect.disabled = false;
+  }
+
+  function plural(number){
+    const a=number%100,b=number%10;
+    return a>=11&&a<=14?'карточек':b===1?'карточка':b>=2&&b<=4?'карточки':'карточек';
+  }
+
+  function applyFilters(){
+    const list=cards();
+    const time=clean(timeSelect.value), teacher=clean(teacherSelect.value), group=clean(groupSelect.value);
+    let shown=0;
+    list.forEach(card=>{
+      const visible=(!time||cardTime(card)===time)&&(!teacher||cardTeachers(card).includes(teacher))&&(!group||cardGroups(card).includes(group));
+      card.style.display=visible?'':'none';
+      if(visible) shown++;
+    });
+    document.querySelectorAll('#results .day-group').forEach(day=>{
+      day.style.display=[...day.querySelectorAll('.card')].some(card=>card.style.display!=='none')?'':'none';
+    });
+    if(emptyMessage) emptyMessage.remove();
+    emptyMessage=null;
+    if(list.length&&!shown){
+      emptyMessage=document.createElement('div');
+      emptyMessage.className='day-filter-empty';
+      emptyMessage.textContent='По выбранным условиям занятий не найдено.';
+      document.getElementById('results').appendChild(emptyMessage);
+    }
+    const active=[time,teacher,group].filter(Boolean).length;
+    resultText.textContent=list.length?'Показано: '+shown+' '+plural(shown)+' из '+list.length+(active?' · дополнительных условий: '+active:''):modeMeta()[1]+'.';
+  }
+
+  primary.addEventListener('change',()=>{
+    if(!primary.value){ showEmpty(); resetSecondary(); resultText.textContent=modeMeta()[1]+'.'; return; }
+    showSchedule(primary.value);
+    populateSecondary();
+    applyFilters();
+  });
+  [timeSelect,teacherSelect,groupSelect].forEach(select=>select.addEventListener('change',applyFilters));
+  resetButton.addEventListener('click',()=>{
+    if(!primary.value){ resetSecondary(); return; }
+    populateSecondary();
+    applyFilters();
+  });
+
+  const priorSwitchMode=switchMode;
+  switchMode=function(mode){
+    if(mode==='student') return;
+    const output=priorSwitchMode(mode);
+    if(mode!=='day'&&mode!=='room') fillPrimary();
+    return output;
+  };
+
+  function groupClick(event){
+    const button=event.target.closest('.group-link');
+    if(!button || !panel.contains(primary)) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    if(!primary.value) return;
+    const label=clean(button.textContent);
+    const option=[...groupSelect.options].find(item=>clean(item.textContent)===label);
+    if(option){ groupSelect.value=option.value; applyFilters(); }
+  }
+  document.getElementById('results').addEventListener('click',groupClick,true);
+  document.getElementById('status').addEventListener('click',groupClick,true);
+
+  fillPrimary();
 })();
 </script>
 </body>
