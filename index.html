@@ -1646,7 +1646,8 @@ function card(r){
 
   let conflictHtml = '';
   if(conflicts.length){
-    const names = [...new Set(conflicts.map(c => c.teacher + ' — ' + c.group))].join('; ');
+    const names = [...new Set(conflicts.map(c => c.teacher + ' — ' +
+      (typeof window.canonicalGroupText === 'function' ? window.canonicalGroupText(c.group) : c.group)))].join('; ');
     conflictHtml = `<div class="conflict-warn">⚠ Пересечение с: ${names}</div>`;
   }
   if(flaggedConflict){
@@ -3133,7 +3134,7 @@ try{if(typeof showEmpty==='function') showEmpty();}catch(e){}
 // Короткая инструкция: академическую группу используют для общих предметов,
 // 202_1/3–202_4/3 — для арабского ОВЯ.
 const help=document.getElementById('modeHelp');
-if(help) help.textContent='Для арабского ОВЯ 2 курса выбирайте свою языковую группу 202_1/3, 202_2/3, 202_3/3 или 202_4/3. Для общих предметов выбирайте академическую группу: 2и_арабский, 2п_арабский, 2ф_арабский или 2э_арабский.';
+if(help) help.textContent='Выберите нужную вкладку и задайте фильтры в любом порядке.';
 })();
 
 </script>
@@ -6372,6 +6373,95 @@ relabelRoot(document.getElementById('status'));
     font-size:15px;
     font-weight:700;
   }
+
+  /* Печатная версия: карточки должны оставаться отдельными блоками.
+     Правила расположены в конце каскада, чтобы браузер не превращал
+     большой список занятий в непрерывный текст при сохранении в PDF. */
+  @media print{
+    #results .day-time-section{
+      display:block !important;
+      margin:18px 0 24px !important;
+    }
+    #results .day-time-heading{
+      display:flex !important;
+      align-items:center !important;
+      justify-content:space-between !important;
+      gap:12px !important;
+      margin:0 0 10px !important;
+      padding:7px 12px !important;
+      border:1px solid #cfd8cb !important;
+      border-radius:12px !important;
+      background:#edf2ea !important;
+      color:#1f2a24 !important;
+      break-after:avoid !important;
+      page-break-after:avoid !important;
+      -webkit-print-color-adjust:exact;
+      print-color-adjust:exact;
+    }
+    #results .day-time-heading small{
+      display:block !important;
+      margin-left:auto !important;
+    }
+    #results .card{
+      display:block !important;
+      position:relative !important;
+      box-sizing:border-box !important;
+      width:100% !important;
+      margin:0 0 10px !important;
+      padding:12px 14px !important;
+      border:1px solid #d8cdbd !important;
+      border-left:5px solid #95613f !important;
+      border-radius:8px !important;
+      background:#fffaf2 !important;
+      box-shadow:none !important;
+      break-inside:avoid !important;
+      page-break-inside:avoid !important;
+      -webkit-print-color-adjust:exact;
+      print-color-adjust:exact;
+    }
+    #results .card + .card{
+      margin-top:10px !important;
+    }
+    #results .card .day-card-meta{
+      display:inline-flex !important;
+      margin:0 0 7px !important;
+      padding:3px 8px !important;
+    }
+    #results .card .row1{
+      display:flex !important;
+      flex-wrap:wrap !important;
+      align-items:baseline !important;
+      gap:6px 14px !important;
+      margin:0 0 6px !important;
+    }
+    #results .card .time{
+      display:inline-block !important;
+      flex:0 0 74px !important;
+      min-width:74px !important;
+    }
+    #results .card .discipline{
+      display:block !important;
+      flex:1 1 360px !important;
+    }
+    #results .card .details{
+      display:block !important;
+      margin-top:5px !important;
+      line-height:1.42 !important;
+    }
+    #results .card .group-code,
+    #results .card .teacher-link,
+    #results .card .room-pill{
+      display:inline-block !important;
+    }
+    #results .card .room-row,
+    #results .card .joint-reading,
+    #results .card .conflict-warn,
+    #results .card .group-conflict-warn,
+    #results .card .code-warn{
+      display:block !important;
+      margin-top:7px !important;
+    }
+  }
 </style>
 <script>
 (function(){
@@ -7556,7 +7646,9 @@ relabelRoot(document.getElementById('status'));
   const EXTRA_ALIASES = {
     '2 курс, историки, тайско-кхмерская группа':'2 курс — история — тайско-кхмерский',
     '2 курс, экономисты, тайско-кхмерская группа':'2 курс — экономика — тайско-кхмерский',
-    '202_3/3':'2 курс — экономика — арабский'
+    '202_3/3':'2 курс — экономика — арабский',
+    '1ф_вьетнамско-индонезийский':'1 курс — филология — вьет.-индонез.',
+    '1и_пушту':'1 курс — история — пушту-дари'
   };
 
   function displayGroupName(code){
@@ -7650,16 +7742,25 @@ relabelRoot(document.getElementById('status'));
   function relabel(root){
     if(!root) return;
     const elements=[];
-    if(root.nodeType===1) elements.push(root);
-    if(root.querySelectorAll) elements.push(...root.querySelectorAll('[data-group], .group-code, .conflict-warn, .group-conflict-warn, .suggest-item, .browse-name, option'));
+    const selector='[data-group], .group-code, .conflict-warn, .group-conflict-warn, .suggest-item, .browse-name, option';
+    // Не переписываем textContent контейнера карточки или секции целиком:
+    // это уничтожает вложенную разметку и превращает расписание в сплошной текст.
+    if(root.nodeType===1 && root.matches && root.matches(selector)) elements.push(root);
+    if(root.querySelectorAll) elements.push(...root.querySelectorAll(selector));
     elements.forEach(el=>{
       if(el.tagName==='OPTION' && /западный язык\s*\(гр\.\s*\d+\)/i.test(el.textContent||'')){
         el.remove();
         return;
       }
       if(el.matches && el.matches('[data-group]')){
-        const label=displayGroupName(el.getAttribute('data-group'));
-        if(label && el.textContent!==label) el.textContent=label;
+        const approved=approvedGroupsForValue(el.getAttribute('data-group'));
+        const label=approved.map(item=>item.label).join('; ');
+        if(label && el.textContent!==label){
+          el.textContent=label;
+        }else if(!label && el.matches('.group-code, .group-link')){
+          // Несогласованные коды не показываем пользователю.
+          el.remove();
+        }
         return;
       }
       if(el.tagName==='OPTION' && el.closest && el.closest('#scheduleFilterGroup, #qGroupSelect')){
@@ -7672,10 +7773,197 @@ relabelRoot(document.getElementById('status'));
     });
   }
 
+  const APPROVED_ENTRIES=Object.entries(APPROVED_GROUP_LABELS);
+  const APPROVED_BY_LABEL=new Map(APPROVED_ENTRIES.map(([code,label])=>[norm(label),{code,label}]));
+  const APPROVED_BY_CODE_LENGTH=[...APPROVED_ENTRIES].sort((a,b)=>b[0].length-a[0].length);
+  const APPROVED_META=APPROVED_ENTRIES.map(([code,label])=>{
+    const match=label.match(/^(\d) курс( магистратуры)? — ([^—]+) — (.+)$/);
+    return match?{
+      code,
+      label,
+      course:match[1]+' курс'+(match[2]||''),
+      direction:norm(match[3]),
+      language:norm(match[4]).replace(/\s*\([^)]*\)\s*$/,'').replace(/,\s*группа\s*\d+$/,'')
+    }:null;
+  }).filter(Boolean);
+
+  function rowCourseName(row){
+    const value=norm(row&&row.course);
+    const bachelor=value.match(/^([1-4])\s*(?:курс\s*)?бак/);
+    if(bachelor) return bachelor[1]+' курс';
+    const master=value.match(/^([12])\s*(?:курс\s*)?маг/);
+    if(master) return master[1]+' курс магистратуры';
+    return '';
+  }
+
+  function inferredApprovedGroups(row){
+    const course=rowCourseName(row);
+    if(!course) return [];
+    const text=norm([
+      row&&row.group,
+      row&&row.direction,
+      row&&row.extra,
+      row&&row.discipline
+    ].filter(Boolean).join(' '));
+    const directionText=norm([row&&row.group,row&&row.direction].filter(Boolean).join(' '));
+    const directions=[];
+    const addDirection=value=>{if(value&&!directions.includes(value)) directions.push(value);};
+    if(/историк|\bистория\b/.test(directionText)) addDirection('история');
+    if(/политолог|\bполитика\b/.test(directionText)) addDirection(course.includes('магистратуры')?'политология':'политика');
+    if(/филолог/.test(directionText)) addDirection('филология');
+    if(/экономист|\bэкономика\b/.test(directionText)) addDirection('экономика');
+    if(/японоведен/.test(directionText)) addDirection('японоведение');
+    if(/лингвист|\bязыки\b|поток\s+языков/.test(directionText)) addDirection('языки');
+
+    const languageAliases={
+      'арабский':['араб'],
+      'африкаанс':['африкаанс'],
+      'амхарский':['амхар'],
+      'армянский':['армян'],
+      'вьет.-индонез.':['вьет','индонез'],
+      'вьетнамский':['вьетнам'],
+      'грузинский':['грузин'],
+      'иврит':['иврит','израил'],
+      'индонез.-малайский':['индонез','малай'],
+      'индонезийский':['индонез'],
+      'китайский':['китай','кит.'],
+      'корейский':['корей'],
+      'персидский':['персид','фарси'],
+      'пушту-дари':['пушту','дари'],
+      'суахили':['суахили'],
+      'тайско-кхмерский':['тайско-кхмер','кхмер'],
+      'тайско-малазийский':['тайско-малаз','малазий'],
+      'турецкий':['турец'],
+      'филип.-индонез.':['филип','индонез'],
+      'филиппинский':['филиппин'],
+      'хауса':['хауса'],
+      'хинди':['хинди'],
+      'японский':['япон']
+    };
+    const languages=[];
+    Object.entries(languageAliases).forEach(([language,aliases])=>{
+      if(aliases.some(alias=>text.includes(alias))&&!languages.includes(language)) languages.push(language);
+    });
+    if(/(?:^|\D)(?:102|202)(?:\D|$)/.test(text)&&!languages.includes('арабский')) languages.push('арабский');
+    if(/(?:^|\D)(?:109|209|309|409)(?:\D|$)/.test(text)&&!languages.includes('китайский')) languages.push('китайский');
+    if(/(?:^|\D)(?:110|210|310)(?:\D|$)/.test(text)&&!languages.includes('корейский')) languages.push('корейский');
+    if(/(?:^|\D)(?:119|219|319|419)(?:\D|$)/.test(text)&&!languages.includes('турецкий')) languages.push('турецкий');
+    if(/(?:^|\D)(?:123|223|323|423)(?:\D|$)/.test(text)&&!languages.includes('хинди')) languages.push('хинди');
+    if(/(?:^|\D)(?:124|224|324|424|434)(?:\D|$)/.test(text)&&!languages.includes('японский')) languages.push('японский');
+
+    if(!directions.length&&!languages.length) return [];
+    let candidates=APPROVED_META.filter(item=>item.course===course);
+    if(directions.length) candidates=candidates.filter(item=>directions.includes(item.direction));
+    if(languages.length) candidates=candidates.filter(item=>languages.includes(item.language));
+    return candidates.map(({code,label})=>({code,label}));
+  }
+
+  function approvedGroupsForValue(value){
+    const raw=String(value==null?'':value).trim();
+    if(!raw) return [];
+    const found=[];
+    const seen=new Set();
+    const add=(code,label)=>{
+      if(!code||!label||seen.has(code)) return;
+      seen.add(code);
+      found.push({code,label});
+    };
+    if(APPROVED_GROUP_LABELS[raw]) add(raw,APPROVED_GROUP_LABELS[raw]);
+    const labelMatch=APPROVED_BY_LABEL.get(norm(raw));
+    if(labelMatch) add(labelMatch.code,labelMatch.label);
+    APPROVED_BY_CODE_LENGTH.forEach(([code,label])=>{
+      if(raw.includes(code)) add(code,label);
+    });
+    const displayed=displayGroupName(raw);
+    String(displayed||'').split(/\s*;\s*/).forEach(label=>{
+      const match=APPROVED_BY_LABEL.get(norm(label));
+      if(match) add(match.code,match.label);
+    });
+    const stored=GROUP_LABELS[raw];
+    const storedMatch=APPROVED_BY_LABEL.get(norm(stored));
+    if(storedMatch) add(storedMatch.code,storedMatch.label);
+    return found;
+  }
+
+  function approvedGroupsForRow(row){
+    const values=Array.isArray(row&&row.groups)&&row.groups.length?row.groups:[row&&row.group];
+    const found=[];
+    const seen=new Set();
+    values.forEach(value=>approvedGroupsForValue(value).forEach(item=>{
+      if(seen.has(item.code)) return;
+      seen.add(item.code);
+      found.push(item);
+    }));
+    if(found.length) return found;
+    return inferredApprovedGroups(row);
+  }
+
+  function readableGroupDescriptor(value,row){
+    const raw=String(value==null?'':value).replace(/\s+/g,' ').trim();
+    const lower=norm(raw);
+    if(!raw||['-','?','000','100','127','20','не знаю','пока не известно'].includes(lower)){
+      return 'группа в источнике не указана';
+    }
+    const western=raw.match(/^(\d)\s*бакалавриат:\s*западный язык,\s*гр\.\s*(\d+)$/i);
+    if(western) return western[1]+' курс — западный язык — группа '+western[2];
+    if(/^(весь|все)\s+(поток|курс|групп)/i.test(raw)||/^(все|весь)\s+/i.test(raw)){
+      return raw.charAt(0).toLowerCase()+raw.slice(1);
+    }
+    if(/^(набор|новый набор)/i.test(raw)) return 'поток нового набора';
+    if(/кафедральная сетка преподавателя|языковая подгруппа преподавателя/i.test(raw)){
+      return 'языковая подгруппа кафедры';
+    }
+    if(/бакалавры-иностранцы/i.test(raw)) return raw;
+    if(/^\d\s*курс[, ]/i.test(raw)||/историк|политолог|филолог|экономист|литературовед|лингвист|магистрант|поток|групп/i.test(raw)){
+      return raw;
+    }
+    if(/\d{2}\s*[бм]\s*[\/\\]|^[1-4][ипфэ]_|^\d+(?:[_-]\d+)*$/i.test(raw)){
+      return 'подгруппа по данным кафедры';
+    }
+    return raw;
+  }
+
+  window.canonicalGroupText=function(value){
+    const groups=approvedGroupsForValue(value);
+    return groups.length?groups.map(item=>item.label).join(', '):'группа требует сопоставления';
+  };
+
+  function replaceCardGroupNames(element,row){
+    if(!element) return;
+    const nodes=[...element.querySelectorAll('.details .group-code')];
+    if(!nodes.length) return;
+    const groups=approvedGroupsForRow(row);
+    const fragment=document.createDocumentFragment();
+    if(groups.length){
+      groups.forEach((item,index)=>{
+        if(index) fragment.appendChild(document.createTextNode(' '));
+        const button=document.createElement('button');
+        button.className='group-code group-link';
+        button.setAttribute('data-group',item.code);
+        button.title='Показать полное расписание группы';
+        button.textContent=item.label;
+        fragment.appendChild(button);
+      });
+      nodes[0].replaceWith(fragment);
+      nodes.slice(1).forEach(node=>node.remove());
+    }else{
+      // Не оставляем карточку без группы и не возвращаем старый код.
+      const details=element.querySelector('.details');
+      if(details){
+        const pending=document.createElement('span');
+        pending.className='group-code group-pending';
+        pending.textContent='группа требует сопоставления';
+        nodes[0].replaceWith(pending);
+        nodes.slice(1).forEach(node=>node.remove());
+      }
+    }
+  }
+
   if(typeof card === 'function'){
     const previousCard=card;
     card=function(row){
       const element=previousCard(row);
+      replaceCardGroupNames(element,row);
       relabel(element);
       return element;
     };
@@ -7684,6 +7972,8 @@ relabelRoot(document.getElementById('status'));
   function updateHelp(){
     const help=document.getElementById('studentHelp');
     if(help) help.textContent='Выберите полное название группы: курс — направление — язык.';
+    const modeHelp=document.getElementById('modeHelp');
+    if(modeHelp) modeHelp.textContent='Выберите нужную вкладку и задайте фильтры в любом порядке.';
   }
 
   if(typeof switchMode === 'function'){
