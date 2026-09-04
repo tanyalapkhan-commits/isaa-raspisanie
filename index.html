@@ -868,7 +868,7 @@ function switchMode(mode){
     browseToggle.textContent = 'Показать список всех преподавателей';
   } else if(mode === 'student') {
     qLabel.textContent = 'Выберите группу';
-    qInput.placeholder = 'Например: 24Б/И309, китайский, история…';
+    qInput.placeholder = 'Выберите согласованное название группы из списка…';
     browseToggle.textContent = 'Показать все группы';
   } else if(mode === 'course') {
     qLabel.textContent = 'Выберите курс';
@@ -1450,7 +1450,7 @@ function showSchedule(key){
     if(MODE === 'student' && ARABIC_OVA_SUBGROUPS.has(key)){
       statusEl.innerHTML =
         'Для «<b>'+displayName+'</b>» в актуальных файлах 2026/27 не указано, какие именно из кафедральных слотов относятся к этой подгруппе. ' +
-        'Подгруппа существует, но распределение преподавателей/времени между 202_1/3–202_4/3 отсутствует; его нельзя угадывать.';
+        'Подгруппа существует, но распределение преподавателей и времени между языковыми подгруппами отсутствует; его нельзя угадывать.';
       resultsEl.innerHTML =
         '<div class="empty"><b>Не подменяем неизвестные данные.</b><br><br>' +
         'Можно открыть общую кафедральную сетку ОВЯ 2 курса: ' +
@@ -1521,7 +1521,7 @@ function showSchedule(key){
       statusEl.innerHTML += '<br><div style="margin-top:8px;padding:10px 12px;border:1px solid #e1c86a;border-radius:10px;background:#fff8dd">'
         + '<b>ОВЯ арабский, 2 курс:</b> академической группе больше не показывается вся кафедральная сетка как персональное расписание. '
         + '<b>Внутренний регламент: не более 2 языковых пар у одного студента в день.</b> '
-        + 'Распределение студентов по языковым подгруппам 202_1/3–202_4/3 в имеющихся файлах не задано. Для проверки преподавательской сетки: ' + gridButtons + '</div>';
+        + 'Распределение студентов по языковым подгруппам в имеющихся файлах не задано. Для проверки преподавательской сетки: ' + gridButtons + '</div>';
     }
     if(selectedCourse === '1 бакалавриат' && lang === 'арабский'){
       statusEl.innerHTML += '<br><div style="margin-top:8px;padding:10px 12px;border:1px solid #d9dee8;border-radius:10px;background:#fafbfc">'
@@ -1973,7 +1973,7 @@ try{ if(typeof buildGroupItems==='function') buildGroupItems(); if(typeof buildB
     studentBtn.classList.add('active');
 
     if (typeof qLabel !== 'undefined' && qLabel) qLabel.textContent = 'Найдите свою группу';
-    if (typeof qInput !== 'undefined' && qInput) qInput.placeholder = 'Например: 2 курс — история — арабский…';
+    if (typeof qInput !== 'undefined' && qInput) qInput.placeholder = 'Выберите согласованное название группы из списка…';
     if (typeof browseToggle !== 'undefined' && browseToggle) browseToggle.textContent = 'Показать список всех групп';
   });
 
@@ -2661,8 +2661,8 @@ new MutationObserver(ms=>ms.forEach(m=>m.addedNodes.forEach(n=>{if(n.nodeType===
 const help=document.getElementById('modeHelp');
 const q=document.getElementById('q');
 function studentHint(){
-  if(help) help.textContent='Студентам 2–4 курса: ищите себя по схеме 3ф_японский, 4и_вьетнамский. Магистратура: м2э_арабский, м2и_китайский.';
-  if(q) q.placeholder='Например: 3ф_японский или м2э_арабский';
+  if(help) help.textContent='Выберите полное название группы: курс — направление — язык.';
+  if(q) q.placeholder='Выберите согласованное название группы из списка…';
 }
 const personal=document.getElementById('modeStudentPersonal');
 const groups=document.getElementById('modeStudent');
